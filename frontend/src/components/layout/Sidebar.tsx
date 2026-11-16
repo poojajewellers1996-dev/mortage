@@ -27,10 +27,18 @@ function isItemActive(pathname: string, href: string): boolean {
   if (href === "/dashboard/girvi/new") {
     return pathname === "/dashboard/girvi/new";
   }
+  if (href === "/dashboard/girvi/released") {
+    return (
+      pathname === "/dashboard/girvi/released" ||
+      pathname.startsWith("/dashboard/girvi/released/")
+    );
+  }
   if (href === "/dashboard/girvi") {
     return (
       pathname === "/dashboard/girvi" ||
-      (pathname.startsWith("/dashboard/girvi/") && pathname !== "/dashboard/girvi/new")
+      (pathname.startsWith("/dashboard/girvi/") &&
+        pathname !== "/dashboard/girvi/new" &&
+        !pathname.startsWith("/dashboard/girvi/released"))
     );
   }
   return pathname.startsWith(href);
@@ -61,9 +69,16 @@ export function Sidebar() {
       group: "GIRVI & LOAN OPS",
       items: [
         {
-          name: "All Girvi Pledges",
+          name: "Active Pledges",
           href: "/dashboard/girvi",
           icon: FileText,
+          badge: "Active",
+        },
+        {
+          name: "Released Pledges",
+          href: "/dashboard/girvi/released",
+          icon: CheckCircle2,
+          badge: "Released",
         },
         {
           name: "Customers",
