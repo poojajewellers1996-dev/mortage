@@ -447,7 +447,12 @@ export function EditModal({
     e.preventDefault();
 
     if (!customerMobile.trim()) {
-      toast.error("Customer mobile number cannot be empty.");
+      toast.error("Customer mobile number is compulsory (मोबाइल नंबर अनिवार्य है).");
+      return;
+    }
+    const cleanCustMobile = customerMobile.replace(/\D/g, "");
+    if (cleanCustMobile.length < 10) {
+      toast.error("Customer mobile number must be at least 10 digits.");
       return;
     }
     if (!customerName.trim()) {
@@ -574,7 +579,7 @@ export function EditModal({
               <div>
                 <Label className="text-xs font-bold text-amber-900 mb-1.5 flex items-center gap-1">
                   <Phone className="h-3 w-3 text-amber-600" />
-                  <span>Mobile Number (मोबाइल नंबर) *</span>
+                  <span>Mobile Number (मोबाइल नंबर) * (Compulsory)</span>
                 </Label>
                 <Input
                   required

@@ -34,7 +34,7 @@ const createPledgeSchema = z.object({
       name: z.string().min(2),
       relationType: z.enum(['S/O', 'D/O', 'W/O', 'C/O', 'O']).default('S/O'),
       relationName: z.string().optional().nullable(),
-      mobileNumber: z.string().optional().nullable().or(z.literal('')),
+      mobileNumber: z.string().min(10, 'Customer mobile number is compulsory (minimum 10 digits)'),
       secondaryMobile: z.string().optional().nullable(),
       email: z.string().email().optional().nullable().or(z.literal('')),
       monthlyIncome: z.union([z.number(), z.string()]).default(0),

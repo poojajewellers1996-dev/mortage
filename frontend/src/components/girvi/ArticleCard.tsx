@@ -181,6 +181,7 @@ export function ArticleCard({
             placeholder="1"
             value={article.quantity !== undefined && article.quantity !== null ? article.quantity : 1}
             onChange={(e) => handleFieldChange("quantity", parseInt(e.target.value, 10) || 1)}
+            onWheel={(e) => (e.target as HTMLElement).blur()}
             required
           />
         </div>
@@ -192,11 +193,12 @@ export function ArticleCard({
           </Label>
           <Input
             type="number"
-            step="0.001"
+            step="any"
             min="0"
             placeholder="0.000"
             value={article.grossWeight !== undefined && article.grossWeight !== null ? article.grossWeight : ""}
             onChange={(e) => handleFieldChange("grossWeight", e.target.value)}
+            onWheel={(e) => (e.target as HTMLElement).blur()}
             required
           />
         </div>
@@ -206,11 +208,12 @@ export function ArticleCard({
           <Label>Less Weight (g) (Deduction)</Label>
           <Input
             type="number"
-            step="0.001"
+            step="any"
             min="0"
             placeholder="0.000"
             value={article.lessWeight !== undefined && article.lessWeight !== null ? article.lessWeight : ""}
             onChange={(e) => handleFieldChange("lessWeight", e.target.value)}
+            onWheel={(e) => (e.target as HTMLElement).blur()}
           />
         </div>
 
@@ -234,11 +237,12 @@ export function ArticleCard({
           </Label>
           <Input
             type="number"
-            step="100"
+            step="any"
             min="0"
             placeholder="e.g. 50000"
             value={article.presentValue !== undefined && article.presentValue !== null ? article.presentValue : ""}
             onChange={(e) => handleFieldChange("presentValue", e.target.value)}
+            onWheel={(e) => (e.target as HTMLElement).blur()}
             required
           />
         </div>
@@ -250,11 +254,12 @@ export function ArticleCard({
           </Label>
           <Input
             type="number"
-            step="100"
+            step="any"
             min="0"
             placeholder="e.g. 35000"
             value={article.loanAmount !== undefined && article.loanAmount !== null ? article.loanAmount : ""}
             onChange={(e) => handleFieldChange("loanAmount", e.target.value)}
+            onWheel={(e) => (e.target as HTMLElement).blur()}
             required
           />
         </div>

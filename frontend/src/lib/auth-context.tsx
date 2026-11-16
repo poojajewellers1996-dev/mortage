@@ -31,6 +31,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
+  // Globally prevent mouse wheel from incrementing or decrementing values on number inputs
+  useEffect(() => {
+    const handleGlobalWheel = () => {
+      if (
+        typeof document !== "undefined" &&
+        document.activeElement instanceof HTMLInputElement &&
+        document.activeElement.type === "number"
+      ) {
+        document.activeElement.blur();
+      }
+    };
+    window.addEventListener("wheel", handleGlobalWheel, { passive: true });
+    return () => window.removeEventListener("wheel", handleGlobalWheel);
+  }, []);
+
   useEffect(() => {
     const storedToken = localStorage.getItem("girvi_token");
     const storedUser = localStorage.getItem("girvi_user");
