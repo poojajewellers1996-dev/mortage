@@ -88,20 +88,6 @@ export default function NewGirviPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch initial auto-generated pledge number
-  useEffect(() => {
-    api
-      .getNextPledgeNumber()
-      .then((res) => {
-        if (res.success && res.nextNumber) {
-          setPledgeNumber(res.nextNumber);
-        }
-      })
-      .catch((err) => {
-        console.warn("Could not fetch next pledge number:", err);
-      });
-  }, []);
-
   // Update customer fields
   const handleCustomerChange = (field: string, value: any) => {
     setCustomer((prev) => ({ ...prev, [field]: value }));
