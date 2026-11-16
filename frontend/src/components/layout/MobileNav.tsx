@@ -14,7 +14,6 @@ import {
   LogOut,
   Shield,
   Gem,
-  Lock,
   X,
   Sparkles,
   ChevronRight,
@@ -23,6 +22,22 @@ import {
 interface MobileNavProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+function isItemActive(pathname: string, href: string): boolean {
+  if (href === "/dashboard") {
+    return pathname === "/dashboard";
+  }
+  if (href === "/dashboard/girvi/new") {
+    return pathname === "/dashboard/girvi/new";
+  }
+  if (href === "/dashboard/girvi") {
+    return (
+      pathname === "/dashboard/girvi" ||
+      (pathname.startsWith("/dashboard/girvi/") && pathname !== "/dashboard/girvi/new")
+    );
+  }
+  return pathname.startsWith(href);
 }
 
 export function MobileNav({ isOpen, onClose }: MobileNavProps) {
@@ -44,7 +59,6 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
           name: "New Girvi Pledge",
           href: "/dashboard/girvi/new",
           icon: PlusCircle,
-          isAction: true,
           badge: "Form 1A",
         },
       ],
@@ -120,42 +134,13 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
           <nav className="space-y-4">
             {navGroups.map((section) => (
               <div key={section.group} className="space-y-1">
-                <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400/90">
+                <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400/80">
                   {section.group}
                 </p>
                 <div className="space-y-1">
                   {section.items.map((item) => {
-                    const isActive =
-                      item.href === "/dashboard"
-                        ? pathname === "/dashboard"
-                        : pathname.startsWith(item.href);
+                    const isActive = isItemActive(pathname, item.href);
                     const Icon = item.icon;
-
-                    if (item.isAction) {
-                      return (
-                        <Link
-                          key={item.name}
-                          href={item.href}
-                          onClick={onClose}
-                          className={cn(
-                            "flex items-center justify-between px-3 py-2.5 my-1 rounded-xl text-xs font-bold transition-colors border",
-                            isActive
-                              ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20"
-                              : "bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25"
-                          )}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <Icon className="h-4 w-4 shrink-0" />
-                            <span>{item.name}</span>
-                          </div>
-                          {item.badge && (
-                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-400 text-slate-950">
-                              {item.badge}
-                            </span>
-                          )}
-                        </Link>
-                      );
-                    }
 
                     return (
                       <Link
@@ -163,17 +148,22 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
                         href={item.href}
                         onClick={onClose}
                         className={cn(
-                          "flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-colors",
+                          "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors",
                           isActive
-                            ? "bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-transparent text-amber-300 border-l-2 border-amber-400 pl-2.5 font-bold"
-                            : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                            ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
+                            : "text-slate-300 hover:bg-slate-800/70 hover:text-white"
                         )}
                       >
                         <div className="flex items-center gap-2.5">
-                          <Icon className="h-4 w-4 shrink-0 text-slate-400" />
+                          <Icon
+                            className={cn(
+                              "h-4 w-4 shrink-0",
+                              isActive ? "text-slate-950" : "text-slate-400"
+                            )}
+                          />
                           <span>{item.name}</span>
                         </div>
-                        {isActive && <ChevronRight className="h-3.5 w-3.5 text-amber-400" />}
+                        {isActive && <ChevronRight className="h-4 w-4 text-slate-950/70" />}
                       </Link>
                     );
                   })}
