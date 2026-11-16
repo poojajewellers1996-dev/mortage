@@ -27,6 +27,7 @@ export function buildApp(): FastifyInstance {
   });
 
   // Handle empty JSON bodies gracefully (e.g. DELETE requests) without throwing FST_ERR_CTP_EMPTY_JSON_BODY
+  app.removeContentTypeParser('application/json');
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
     if (!body || (typeof body === 'string' && body.trim() === '')) {
       done(null, {});
