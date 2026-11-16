@@ -7,7 +7,7 @@ dotenv.config();
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/girvi_db';
 
 // Supabase SSL requirement check
-const isSupabase = connectionString.includes('supabase.co');
+const isSupabase = connectionString.includes('supabase.co') || connectionString.includes('supabase.com') || connectionString.includes('pooler');
 
 export const client = postgres(connectionString, {
   max: 10,

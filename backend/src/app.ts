@@ -70,13 +70,29 @@ export function buildApp(): FastifyInstance {
     secret: process.env.JWT_SECRET || 'super_secret_jwt_key_girvi_system_change_in_production_2026',
   });
 
-  // Health-check Endpoint
+  // Root and Health-check Endpoints
+  app.get('/', async () => {
+    return {
+      name: 'Girvi Management Backend API',
+      status: 'online',
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      routes: {
+        health: '/health',
+        api: '/api',
+      },
+    };
+  });
+
   app.get('/health', async (request, reply) => {
     let dbStatus = 'healthy';
+    let dbError = undefined;
     try {
       await client`SELECT 1`;
-    } catch {
+    } catch (err: any) {
       dbStatus = 'degraded_or_unreachable';
+      dbError = err?.message;
+      request.log.error(err, 'Health check DB query failed');
     }
 
     return reply.send({
@@ -85,6 +101,7 @@ export function buildApp(): FastifyInstance {
       service: 'Girvi Management Backend API',
       version: '1.0.0',
       database: dbStatus,
+      ...(dbError && { error: dbError }),
     });
   });
 
