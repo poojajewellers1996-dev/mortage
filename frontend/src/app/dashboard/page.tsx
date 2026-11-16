@@ -149,20 +149,42 @@ export default function DashboardPage() {
           <span className="text-[10px] text-emerald-700">Total Capital Disbursed</span>
         </Card>
 
-        {/* Total Jewellery Weight */}
-        <Card className="rounded-2xl border-amber-200 bg-amber-50/40 shadow-sm p-4 relative overflow-hidden">
+        {/* Total Gold in Vault */}
+        <Card className="rounded-2xl border-amber-300 bg-gradient-to-br from-amber-500/10 via-amber-50 to-amber-100/40 shadow-sm p-4 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
-              Jewellery in Vault
+            <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">
+              🪙 Gold in Vault (सोना)
             </span>
-            <div className="p-2 rounded-xl bg-amber-100 text-amber-800">
+            <div className="p-2 rounded-xl bg-amber-500 text-slate-950 shadow-sm font-bold">
               <Scale className="h-4 w-4" />
             </div>
           </div>
           <p className="text-xl sm:text-2xl font-black text-amber-950 mt-2">
-            {formatWeight(s.totalJewelleryWeight)}
+            {formatWeight(s.totalGoldWeight || 0)}
           </p>
-          <span className="text-[10px] text-amber-700">Net Safe Vault Weight</span>
+          <div className="flex items-center justify-between text-[10px] text-amber-800 mt-1 font-semibold">
+            <span>Loan: {formatIndianCurrency(s.totalGoldLoan || 0)}</span>
+            <span>{s.totalGoldActivePledges || 0} Girvi</span>
+          </div>
+        </Card>
+
+        {/* Total Silver in Vault */}
+        <Card className="rounded-2xl border-slate-300 bg-gradient-to-br from-slate-100/90 via-slate-50 to-slate-200/50 shadow-sm p-4 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+              🥈 Silver in Vault (चांदी)
+            </span>
+            <div className="p-2 rounded-xl bg-slate-800 text-white shadow-sm font-bold">
+              <Coins className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-slate-900 mt-2">
+            {formatWeight(s.totalSilverWeight || 0)}
+          </p>
+          <div className="flex items-center justify-between text-[10px] text-slate-600 mt-1 font-semibold">
+            <span>Loan: {formatIndianCurrency(s.totalSilverLoan || 0)}</span>
+            <span>{s.totalSilverActivePledges || 0} Girvi</span>
+          </div>
         </Card>
 
         {/* Overdue Pledges */}
@@ -329,6 +351,7 @@ export default function DashboardPage() {
                 <tr>
                   <th className="px-4 py-3">Pledge #</th>
                   <th className="px-4 py-3">Customer Name</th>
+                  <th className="px-4 py-3 text-center">Metal</th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Due Date</th>
                   <th className="px-4 py-3 text-right">Net Wt</th>
@@ -340,7 +363,7 @@ export default function DashboardPage() {
               <tbody className="divide-y divide-slate-100">
                 {s.recentPledges.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-xs text-slate-500">
+                    <td colSpan={9} className="py-8 text-center text-xs text-slate-500">
                       No pledges registered yet. Click &quot;New Girvi Entry&quot; to begin.
                     </td>
                   </tr>
@@ -352,7 +375,18 @@ export default function DashboardPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-semibold text-slate-900">{p.customerName || "Customer"}</span>
-                        <span className="block text-xs text-slate-500">{p.customerMobile}</span>
+                        <span className="block text-xs text-slate-500">{p.customerMobile || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {p.metalType === "Silver" ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-800 border border-slate-300">
+                            🥈 Silver
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                            🪙 Gold
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-slate-600 text-xs">
                         {new Date(p.pledgeDate).toLocaleDateString("en-IN")}

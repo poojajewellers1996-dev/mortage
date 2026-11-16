@@ -101,6 +101,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
       const query = request.query as {
         search?: string;
         status?: string;
+        metalType?: string;
         startDate?: string;
         endDate?: string;
         page?: string;
@@ -115,6 +116,10 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
 
       if (query.status && query.status !== 'all') {
         conditions.push(eq(pledges.status, query.status));
+      }
+
+      if (query.metalType && query.metalType !== 'all') {
+        conditions.push(eq(pledges.metalType, query.metalType));
       }
 
       if (query.startDate) {
@@ -389,6 +394,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
 
       const totalLoanWords = numberToIndianWords(totalLoan);
       const initialStatus = data.isDraft ? 'active' : computePledgeStatus('active', data.dueDate);
+      const pledgeMetalType = data.articles.some(a => a.metalType === 'Silver') ? 'Silver' : 'Gold';
 
       // Perform Transactional Insertion
       const createdPledge = await db.transaction(async tx => {
@@ -399,6 +405,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
             customerId: finalCustomerId as string,
             pledgeDate: data.pledgeDate,
             dueDate: data.dueDate,
+            metalType: pledgeMetalType,
             interestRatePercent: String(data.interestRatePercent),
             interestPeriod: data.interestPeriod,
             totalArticlesCount: totalQty,

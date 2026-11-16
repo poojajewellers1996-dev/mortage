@@ -25,6 +25,7 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
           pledgeNumber: pledges.pledgeNumber,
           pledgeDate: pledges.pledgeDate,
           dueDate: pledges.dueDate,
+          metalType: pledges.metalType,
           totalLoanAmount: pledges.totalLoanAmount,
           totalGrossWeight: pledges.totalGrossWeight,
           totalNetWeight: pledges.totalNetWeight,
@@ -42,18 +43,48 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
       let pledgesDueToday = 0;
       let pledgesDueThisMonth = 0;
 
+      // Divided Gold & Silver metrics
+      let totalGoldActivePledges = 0;
+      let totalSilverActivePledges = 0;
+      let totalGoldWeight = 0;
+      let totalSilverWeight = 0;
+      let totalGoldLoan = 0;
+      let totalSilverLoan = 0;
+      let totalGoldPledges = 0;
+      let totalSilverPledges = 0;
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       for (const p of allPledges) {
+        const isGold = (p.metalType || 'Gold') === 'Gold';
+        if (isGold) {
+          totalGoldPledges++;
+        } else {
+          totalSilverPledges++;
+        }
+
         const dynamicStatus = computePledgeStatus(p.status, p.dueDate, p.closedDate);
 
         if (dynamicStatus === 'closed') {
           totalClosedGirvi++;
         } else if (dynamicStatus !== 'cancelled') {
           totalActiveGirvi++;
-          totalLoanAmount += parseFloat(p.totalLoanAmount) || 0;
-          totalJewelleryWeight += parseFloat(p.totalNetWeight) || 0;
+          const loan = parseFloat(p.totalLoanAmount) || 0;
+          const netWt = parseFloat(p.totalNetWeight) || 0;
+
+          totalLoanAmount += loan;
+          totalJewelleryWeight += netWt;
+
+          if (isGold) {
+            totalGoldActivePledges++;
+            totalGoldWeight += netWt;
+            totalGoldLoan += loan;
+          } else {
+            totalSilverActivePledges++;
+            totalSilverWeight += netWt;
+            totalSilverLoan += loan;
+          }
 
           if (dynamicStatus === 'overdue') {
             overduePledges++;
@@ -99,6 +130,14 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
           overduePledges,
           pledgesDueToday,
           pledgesDueThisMonth,
+          totalGoldActivePledges,
+          totalSilverActivePledges,
+          totalGoldWeight,
+          totalSilverWeight,
+          totalGoldLoan,
+          totalSilverLoan,
+          totalGoldPledges,
+          totalSilverPledges,
           recentPledges: recentFormatted,
         },
       });

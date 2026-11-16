@@ -8,7 +8,7 @@ import { formatIndianCurrency, formatWeight } from "@/lib/number-to-words";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import {
   Search,
@@ -16,13 +16,8 @@ import {
   PlusCircle,
   Eye,
   Printer,
-  Calendar,
-  KeyRound,
-  User,
-  ArrowUpDown,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
+  Sparkles,
+  Coins,
 } from "lucide-react";
 
 export default function GirviListPage() {
@@ -30,13 +25,14 @@ export default function GirviListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [metalFilter, setMetalFilter] = useState<"all" | "Gold" | "Silver">("all");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     fetchPledges();
-  }, [search, statusFilter, page]);
+  }, [search, statusFilter, metalFilter, page]);
 
   const fetchPledges = async () => {
     setIsLoading(true);
@@ -44,6 +40,7 @@ export default function GirviListPage() {
       const res = await api.getPledges({
         search: search.trim() || undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
+        metalType: metalFilter !== "all" ? metalFilter : undefined,
         page,
         limit: 15,
       });
@@ -96,13 +93,63 @@ export default function GirviListPage() {
         </Link>
       </div>
 
+      {/* Metal Separation Tabs (Gold vs Silver) */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-200/80 rounded-2xl w-fit">
+        <button
+          type="button"
+          onClick={() => {
+            setMetalFilter("all");
+            setPage(1);
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            metalFilter === "all"
+              ? "bg-white text-slate-950 shadow-sm"
+              : "text-slate-600 hover:text-slate-950"
+          }`}
+        >
+          All Pledges
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMetalFilter("Gold");
+            setPage(1);
+          }}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            metalFilter === "Gold"
+              ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-sm font-extrabold"
+              : "text-amber-800 hover:text-amber-950 hover:bg-amber-100/50"
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5 text-amber-700" />
+          <span>Gold Girvi (सोना)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMetalFilter("Silver");
+            setPage(1);
+          }}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            metalFilter === "Silver"
+              ? "bg-slate-800 text-white shadow-sm font-extrabold"
+              : "text-slate-700 hover:text-slate-950 hover:bg-slate-300/50"
+          }`}
+        >
+          <Coins className="h-3.5 w-3.5 text-slate-400" />
+          <span>Silver Girvi (चांदी)</span>
+        </button>
+      </div>
+
       {/* Filter and Search Bar */}
       <Card className="rounded-xl border-slate-200/90 shadow-sm p-4">
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search by Pledge # (e.g. G-2026), Customer Name, Mobile..."
+              placeholder="Search by Pledge # (e.g. C4678), Customer Name, Mobile..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -141,6 +188,7 @@ export default function GirviListPage() {
                 <tr>
                   <th className="px-4 py-3">Pledge #</th>
                   <th className="px-4 py-3">Customer Details</th>
+                  <th className="px-4 py-3 text-center">Metal</th>
                   <th className="px-4 py-3">Pledge Date</th>
                   <th className="px-4 py-3">Due Date</th>
                   <th className="px-4 py-3 text-right">Items / Net Wt</th>
@@ -152,7 +200,7 @@ export default function GirviListPage() {
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-500">
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
                       <div className="flex flex-col items-center gap-2">
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
                         <span>Searching database records...</span>
@@ -161,7 +209,7 @@ export default function GirviListPage() {
                   </tr>
                 ) : pledges.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-500">
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
                       No pledges found matching your criteria.
                     </td>
                   </tr>
@@ -173,7 +221,18 @@ export default function GirviListPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-semibold text-slate-900">{p.customer?.name}</div>
-                        <div className="text-xs text-slate-500">{p.customer?.mobileNumber}</div>
+                        <div className="text-xs text-slate-500">{p.customer?.mobileNumber || "—"}</div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {p.metalType === "Silver" ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-800 border border-slate-300">
+                            🥈 Silver
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                            🪙 Gold
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-slate-600 text-xs">
                         {new Date(p.pledgeDate).toLocaleDateString("en-IN")}
@@ -183,7 +242,9 @@ export default function GirviListPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="font-medium text-slate-800">{p.totalArticlesCount} pcs</div>
-                        <div className="text-xs font-bold text-amber-800">{formatWeight(p.totalNetWeight)}</div>
+                        <div className={`text-xs font-bold ${p.metalType === "Silver" ? "text-slate-700" : "text-amber-800"}`}>
+                          {formatWeight(p.totalNetWeight)}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right font-black text-emerald-800">
                         {formatIndianCurrency(p.totalLoanAmount)}

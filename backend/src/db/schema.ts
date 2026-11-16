@@ -60,6 +60,7 @@ export const pledges = pgTable('pledges', {
   dueDate: date('due_date').notNull(),
   interestRatePercent: numeric('interest_rate_percent', { precision: 5, scale: 2 }).notNull().default('1.50'),
   interestPeriod: varchar('interest_period', { length: 20 }).notNull().default('monthly'), // 'monthly' | 'yearly'
+  metalType: varchar('metal_type', { length: 50 }).notNull().default('Gold'), // 'Gold' | 'Silver'
   totalArticlesCount: integer('total_articles_count').notNull().default(0),
   totalGrossWeight: numeric('total_gross_weight', { precision: 10, scale: 3 }).notNull().default('0.000'),
   totalLessWeight: numeric('total_less_weight', { precision: 10, scale: 3 }).notNull().default('0.000'),

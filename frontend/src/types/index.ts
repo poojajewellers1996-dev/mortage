@@ -60,6 +60,7 @@ export interface Pledge {
   dueDate: string;
   interestRatePercent: string | number;
   interestPeriod: "monthly" | "yearly";
+  metalType?: string;
   totalArticlesCount: number;
   totalGrossWeight: string;
   totalLessWeight: string;
@@ -124,6 +125,14 @@ export interface DashboardSummary {
   totalClosedGirvi: number;
   totalLoanAmount: number;
   totalJewelleryWeight: number;
+  totalGoldActivePledges?: number;
+  totalSilverActivePledges?: number;
+  totalGoldWeight?: number;
+  totalSilverWeight?: number;
+  totalGoldLoan?: number;
+  totalSilverLoan?: number;
+  totalGoldPledges?: number;
+  totalSilverPledges?: number;
   overduePledges: number;
   pledgesDueToday: number;
   pledgesDueThisMonth: number;

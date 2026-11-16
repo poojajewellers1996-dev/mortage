@@ -102,7 +102,7 @@ export const api = {
   // Pledges
   getNextPledgeNumber: () =>
     apiFetch<{ success: boolean; nextNumber: string }>("/api/pledges/next-number"),
-  getPledges: (params?: { search?: string; status?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) =>
+  getPledges: (params?: { search?: string; status?: string; metalType?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) =>
     apiFetch<{ success: boolean; data: any[]; pagination: any }>("/api/pledges", { params }),
   getPledge: (id: string) =>
     apiFetch<{ success: boolean; data: any }>(`/api/pledges/${id}`),
