@@ -26,6 +26,21 @@ export function buildApp(): FastifyInstance {
     bodyLimit: 15 * 1024 * 1024, // 15MB limit for photos/base64
   });
 
+  // Handle empty JSON bodies gracefully (e.g. DELETE requests) without throwing FST_ERR_CTP_EMPTY_JSON_BODY
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    if (!body || (typeof body === 'string' && body.trim() === '')) {
+      done(null, {});
+      return;
+    }
+    try {
+      const json = JSON.parse(body as string);
+      done(null, json);
+    } catch (err: any) {
+      err.statusCode = 400;
+      done(err, undefined);
+    }
+  });
+
   // Security Headers
   app.register(helmet, {
     contentSecurityPolicy: false,

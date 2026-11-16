@@ -37,7 +37,7 @@ export async function apiFetch<T = any>(endpoint: string, options: FetchOptions 
   const token = typeof window !== "undefined" ? localStorage.getItem("girvi_token") : null;
 
   const requestHeaders = new Headers(headers);
-  if (!requestHeaders.has("Content-Type") && !(restOptions.body instanceof FormData)) {
+  if (restOptions.body && !requestHeaders.has("Content-Type") && !(restOptions.body instanceof FormData)) {
     requestHeaders.set("Content-Type", "application/json");
   }
   if (token && !requestHeaders.has("Authorization")) {
