@@ -137,37 +137,35 @@ export function ArticleCard({
           />
         </div>
 
-        {/* Metal Type */}
-        <div className="space-y-1.5">
-          <Label>Metal Type</Label>
-          <select
-            value={article.metalType || "Gold"}
-            onChange={(e) => handleFieldChange("metalType", e.target.value)}
-            className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-          >
-            <option value="Gold">Gold (सोना)</option>
-            <option value="Silver">Silver (चांदी)</option>
-            <option value="Platinum">Platinum</option>
-            <option value="Diamond">Diamond Studded</option>
-          </select>
-        </div>
-
-        {/* Purity */}
-        <div className="space-y-1.5">
-          <Label>Purity</Label>
-          <select
-            value={article.purity || "22K (916)"}
-            onChange={(e) => handleFieldChange("purity", e.target.value)}
-            className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-          >
-            <option value="22K (916)">22K (916 Hallmarked)</option>
-            <option value="24K (999)">24K (999 Pure)</option>
-            <option value="18K (750)">18K (750)</option>
-            <option value="20K">20K</option>
-            <option value="Silver 925">Silver 92.5 Sterling</option>
-            <option value="Silver Pure">Silver Fine 99.9</option>
-            <option value="Other">Other</option>
-          </select>
+        {/* Metal Option - Direct Selectable Format (Gold / Silver) */}
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label className="text-xs font-bold text-slate-700">
+            Metal Type (धातु) <span className="text-rose-600">*</span>
+          </Label>
+          <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-lg border border-slate-200 h-10 gap-1.5">
+            <button
+              type="button"
+              onClick={() => handleFieldChange("metalType", "Gold")}
+              className={`flex items-center justify-center gap-1.5 rounded-md text-xs font-extrabold transition-all cursor-pointer ${
+                (article.metalType || "Gold") === "Gold"
+                  ? "bg-amber-500 text-white shadow-sm ring-1 ring-amber-600"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+              }`}
+            >
+              <span>🪙 Gold (सोना)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFieldChange("metalType", "Silver")}
+              className={`flex items-center justify-center gap-1.5 rounded-md text-xs font-extrabold transition-all cursor-pointer ${
+                article.metalType === "Silver"
+                  ? "bg-slate-800 text-white shadow-sm ring-1 ring-slate-900"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+              }`}
+            >
+              <span>🥈 Silver (चांदी)</span>
+            </button>
+          </div>
         </div>
 
         {/* Quantity */}
@@ -179,8 +177,14 @@ export function ArticleCard({
             type="number"
             min="1"
             placeholder="1"
-            value={article.quantity !== undefined && article.quantity !== null ? article.quantity : 1}
-            onChange={(e) => handleFieldChange("quantity", parseInt(e.target.value, 10) || 1)}
+            value={article.quantity !== undefined && article.quantity !== null ? article.quantity : ""}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => handleFieldChange("quantity", e.target.value)}
+            onBlur={() => {
+              if (!article.quantity || Number(article.quantity) < 1) {
+                handleFieldChange("quantity", 1);
+              }
+            }}
             onWheel={(e) => (e.target as HTMLElement).blur()}
             required
           />

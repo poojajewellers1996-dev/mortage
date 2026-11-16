@@ -39,7 +39,7 @@ export interface PledgeArticle {
   itemName: string;
   metalType: string;
   purity: string;
-  quantity: number;
+  quantity: number | string;
   grossWeight: number | string;
   lessWeight: number | string;
   netWeight: number | string;

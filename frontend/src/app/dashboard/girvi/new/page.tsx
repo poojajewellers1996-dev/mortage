@@ -161,7 +161,7 @@ export default function NewGirviPage() {
   let totalLoanAmount = 0;
 
   for (const art of articles) {
-    totalQuantity += art.quantity || 1;
+    totalQuantity += parseInt(String(art.quantity || 1), 10) || 1;
     totalGrossWeight += parseFloat(String(art.grossWeight)) || 0;
     totalLessWeight += parseFloat(String(art.lessWeight)) || 0;
     totalNetWeight += parseFloat(String(art.netWeight)) || 0;
@@ -213,9 +213,9 @@ export default function NewGirviPage() {
         isDraft,
         articles: articles.map((a) => ({
           itemName: a.itemName.trim(),
-          metalType: a.metalType,
-          purity: a.purity,
-          quantity: a.quantity,
+          metalType: a.metalType || "Gold",
+          purity: a.purity || "22K",
+          quantity: parseInt(String(a.quantity || 1), 10) || 1,
           grossWeight: parseFloat(String(a.grossWeight)),
           lessWeight: parseFloat(String(a.lessWeight || 0)),
           netWeight: parseFloat(String(a.netWeight)),

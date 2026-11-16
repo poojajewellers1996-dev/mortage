@@ -757,9 +757,9 @@ export function EditModal({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="grid grid-cols-1 gap-2.5">
                       {/* Item Name */}
-                      <div className="sm:col-span-2">
+                      <div>
                         <Label className="text-[11px] font-semibold text-slate-600 mb-1 block">
                           Item Name / Description *
                         </Label>
@@ -767,21 +767,8 @@ export function EditModal({
                           required
                           value={art.itemName}
                           onChange={(e) => updateArticle(index, "itemName", e.target.value)}
-                          placeholder="e.g. 22K Gold Antique Necklace"
+                          placeholder="e.g. Gold Antique Necklace"
                           className="h-8 text-xs bg-white font-medium"
-                        />
-                      </div>
-
-                      {/* Purity */}
-                      <div>
-                        <Label className="text-[11px] font-semibold text-slate-600 mb-1 block">
-                          Purity
-                        </Label>
-                        <Input
-                          value={art.purity}
-                          onChange={(e) => updateArticle(index, "purity", e.target.value)}
-                          placeholder="e.g. 22K or 92.5%"
-                          className="h-8 text-xs bg-white"
                         />
                       </div>
                     </div>
@@ -795,8 +782,14 @@ export function EditModal({
                         <Input
                           type="number"
                           min="1"
-                          value={art.quantity}
+                          value={art.quantity !== undefined && art.quantity !== null ? art.quantity : ""}
+                          onFocus={(e) => e.target.select()}
                           onChange={(e) => updateArticle(index, "quantity", e.target.value)}
+                          onBlur={() => {
+                            if (!art.quantity || Number(art.quantity) < 1) {
+                              updateArticle(index, "quantity", 1);
+                            }
+                          }}
                           className="h-8 text-xs bg-white text-center font-bold"
                         />
                       </div>
@@ -882,19 +875,35 @@ export function EditModal({
                 />
               </div>
 
-              {/* Metal Type */}
+              {/* Metal Type - Direct Selectable Buttons */}
               <div>
                 <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
-                  Metal Type *
+                  Metal Type (धातु) *
                 </Label>
-                <select
-                  value={metalType}
-                  onChange={(e) => setMetalType(e.target.value as any)}
-                  className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-medium"
-                >
-                  <option value="Gold">🪙 Gold (सोना)</option>
-                  <option value="Silver">🥈 Silver (चांदी)</option>
-                </select>
+                <div className="grid grid-cols-2 p-0.5 bg-slate-100 rounded-lg border border-slate-200 h-9 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMetalType("Gold")}
+                    className={`flex items-center justify-center gap-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      metalType === "Gold"
+                        ? "bg-amber-500 text-white shadow-sm ring-1 ring-amber-600"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                    }`}
+                  >
+                    <span>🪙 Gold</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMetalType("Silver")}
+                    className={`flex items-center justify-center gap-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      metalType === "Silver"
+                        ? "bg-slate-800 text-white shadow-sm ring-1 ring-slate-900"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                    }`}
+                  >
+                    <span>🥈 Silver</span>
+                  </button>
+                </div>
               </div>
 
               {/* Storage Location */}
