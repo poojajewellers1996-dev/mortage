@@ -29,13 +29,14 @@ import {
   Calendar,
   Phone,
   User,
+  Check,
 } from "lucide-react";
 
 type MetalTab = "gold" | "silver" | "all";
 type BoxPreset = "ALL" | "1-2000" | "2001-3000" | "3001-4000" | "4001-5000" | "5001-6000" | "CUSTOM";
 type AuditFilter = "all" | "checked" | "unchecked";
 
-// Extract integer numeric digits from pledge numbers like "C4767", "4767", "G-102"
+// Extract numeric integer digits from pledge numbers like "C4767", "4767", "G-102"
 function extractPledgeNumber(pledgeNum?: string | null): number | null {
   if (!pledgeNum) return null;
   const digitsOnly = pledgeNum.replace(/\D/g, "");
@@ -108,67 +109,83 @@ export default function LockerStockPage() {
 
   // Filtered and Sorted Stock
   const filteredStock = useMemo(() => {
-    return stockData.filter((item) => {
-      // 1. Metal Filter
-      if (activeTab === "gold") {
-        if (item.metalType === "Silver") return false;
-      } else if (activeTab === "silver") {
-        if (item.metalType !== "Silver") return false;
-      }
-
-      // 2. Box Range Filter
-      if (boxRange.from !== null || boxRange.to !== null) {
-        const num = extractPledgeNumber(item.pledgeNumber);
-        if (num === null) {
-          // If no numeric digits, do not match numerical range filter
-          return false;
+    return stockData
+      .filter((item) => {
+        // 1. Metal Filter
+        if (activeTab === "gold") {
+          if (item.metalType === "Silver") return false;
+        } else if (activeTab === "silver") {
+          if (item.metalType !== "Silver") return false;
         }
-        if (boxRange.from !== null && num < boxRange.from) return false;
-        if (boxRange.to !== null && num > boxRange.to) return false;
-      }
 
-      // 3. Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const pledgeNo = (item.pledgeNumber || "").toLowerCase();
-        const custName = (item.customer?.name || "").toLowerCase();
-        const custMobile = (item.customer?.mobileNumber || "").toLowerCase();
-        const articleDesc = (item.articles || [])
-          .map((a: any) => (a.articleName || "").toLowerCase())
-          .join(" ");
-
-        if (
-          !pledgeNo.includes(q) &&
-          !custName.includes(q) &&
-          !custMobile.includes(q) &&
-          !articleDesc.includes(q)
-        ) {
-          return false;
+        // 2. Box Range Filter
+        if (boxRange.from !== null || boxRange.to !== null) {
+          const num = extractPledgeNumber(item.pledgeNumber);
+          if (num === null) {
+            return false;
+          }
+          if (boxRange.from !== null && num < boxRange.from) return false;
+          if (boxRange.to !== null && num > boxRange.to) return false;
         }
-      }
 
-      // 4. Physical Audit Check status filter
-      const isChecked = checkedIds.has(item.id);
-      if (auditFilter === "checked" && !isChecked) return false;
-      if (auditFilter === "unchecked" && isChecked) return false;
+        // 3. Search query
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          const pledgeNo = (item.pledgeNumber || "").toLowerCase();
+          const custName = (item.customer?.name || "").toLowerCase();
+          const custMobile = (item.customer?.mobileNumber || "").toLowerCase();
+          const articleDesc = (item.articles || [])
+            .map((a: any) => (a.articleName || "").toLowerCase())
+            .join(" ");
 
-      return true;
-    }).sort((a, b) => {
-      let comp = 0;
-      if (sortField === "pledgeNumber") {
-        const numA = extractPledgeNumber(a.pledgeNumber) || 0;
-        const numB = extractPledgeNumber(b.pledgeNumber) || 0;
-        comp = numA - numB;
-      } else if (sortField === "pledgeDate") {
-        comp = new Date(a.pledgeDate || a.createdAt).getTime() - new Date(b.pledgeDate || b.createdAt).getTime();
-      } else if (sortField === "netWeight") {
-        comp = parseFloat(a.totalNetWeight || "0") - parseFloat(b.totalNetWeight || "0");
-      } else if (sortField === "loanAmount") {
-        comp = parseFloat(a.totalLoanAmount || "0") - parseFloat(b.totalLoanAmount || "0");
-      }
-      return sortOrder === "asc" ? comp : -comp;
-    });
-  }, [stockData, activeTab, boxRange, searchQuery, auditFilter, checkedIds, sortField, sortOrder]);
+          if (
+            !pledgeNo.includes(q) &&
+            !custName.includes(q) &&
+            !custMobile.includes(q) &&
+            !articleDesc.includes(q)
+          ) {
+            return false;
+          }
+        }
+
+        // 4. Physical Audit Check status filter
+        const isChecked = checkedIds.has(item.id);
+        if (auditFilter === "checked" && !isChecked) return false;
+        if (auditFilter === "unchecked" && isChecked) return false;
+
+        return true;
+      })
+      .sort((a, b) => {
+        let comp = 0;
+        if (sortField === "pledgeNumber") {
+          const numA = extractPledgeNumber(a.pledgeNumber) || 0;
+          const numB = extractPledgeNumber(b.pledgeNumber) || 0;
+          comp = numA - numB;
+        } else if (sortField === "pledgeDate") {
+          comp =
+            new Date(a.pledgeDate || a.createdAt).getTime() -
+            new Date(b.pledgeDate || b.createdAt).getTime();
+        } else if (sortField === "netWeight") {
+          comp =
+            parseFloat(a.totalNetWeight || "0") -
+            parseFloat(b.totalNetWeight || "0");
+        } else if (sortField === "loanAmount") {
+          comp =
+            parseFloat(a.totalLoanAmount || "0") -
+            parseFloat(b.totalLoanAmount || "0");
+        }
+        return sortOrder === "asc" ? comp : -comp;
+      });
+  }, [
+    stockData,
+    activeTab,
+    boxRange,
+    searchQuery,
+    auditFilter,
+    checkedIds,
+    sortField,
+    sortOrder,
+  ]);
 
   // Dynamic statistics for the current filtered view
   const currentViewStats = useMemo(() => {
@@ -232,21 +249,21 @@ export default function LockerStockPage() {
   return (
     <div className="space-y-6 pb-16 print:p-0 print:space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/20 print:hidden">
-              <Boxes className="w-5 h-5" />
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 shadow-xs print:hidden">
+              <Boxes className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                 Physical Locker Stock Audit
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 font-normal">
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 font-bold">
                   तिजोरी स्टॉक जांच
                 </span>
               </h1>
-              <p className="text-sm text-slate-400">
-                Auditing items physically in the vault. Excludes Bank Re-pledges and Released pledges.
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Auditing items physically present in the vault. Excludes Bank Re-pledges and Released pledges.
               </p>
             </div>
           </div>
@@ -259,9 +276,9 @@ export default function LockerStockPage() {
             size="sm"
             onClick={fetchStock}
             disabled={isLoading}
-            className="border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
+            className="gap-1.5 text-xs text-slate-700 border-slate-300 hover:bg-slate-100 font-semibold"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
 
@@ -269,99 +286,118 @@ export default function LockerStockPage() {
             variant="outline"
             size="sm"
             onClick={() => window.print()}
-            className="border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+            className="gap-1.5 text-xs text-amber-900 border-amber-300 bg-amber-50 hover:bg-amber-100 font-semibold shadow-xs"
           >
-            <Printer className="w-4 h-4 mr-2" />
+            <Printer className="w-3.5 h-3.5 text-amber-700" />
             Print Stock Sheet
           </Button>
         </div>
       </div>
 
       {/* Exclusions Notice Banner */}
-      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 text-sm text-emerald-200 flex items-start gap-3 print:hidden">
-        <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+      <div className="rounded-xl border border-emerald-300 bg-emerald-50/80 p-3 sm:p-4 text-xs sm:text-sm text-emerald-950 flex items-start gap-3 print:hidden shadow-xs">
+        <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
         <div className="leading-relaxed">
-          <span className="font-semibold text-emerald-300">Clean Vault Inventory Filter Applied:</span>
+          <strong className="text-emerald-900 font-bold">Clean Vault Inventory Filter Applied:</strong>
           {" "}All items shown below are verified to be <strong>physically present in your shop's vault</strong>. 
           Pledges currently <strong>re-pledged in banks</strong> (Kosamattam, Muthoot, BOB, SBI, etc.) or <strong>already released/settled</strong> are strictly excluded from this audit.
         </div>
       </div>
 
-      {/* Metal Selection Tabs (Gold vs Silver vs All) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3 print:hidden">
-        <div className="flex items-center gap-2 p-1 bg-slate-900/90 rounded-xl border border-slate-800">
+      {/* Metal Separation Tabs & Audit Progress */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 print:hidden">
+        {/* Metal Tabs (Gold vs Silver vs All) */}
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-200/80 rounded-2xl w-fit">
           <button
+            type="button"
             onClick={() => setActiveTab("gold")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === "gold"
-                ? "bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 shadow-md shadow-amber-500/20"
-                : "text-slate-400 hover:text-amber-300 hover:bg-slate-800/60"
+                ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-sm font-extrabold"
+                : "text-amber-900 hover:text-amber-950 hover:bg-amber-100/50"
             }`}
           >
-            <Coins className="w-4 h-4" />
+            <Sparkles className="h-3.5 w-3.5 text-amber-900" />
             <span>🪙 Gold Vault Stock (सोना)</span>
             {summary?.gold?.pledgesCount !== undefined && (
-              <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === "gold" ? "bg-slate-950/20 text-slate-950 font-bold" : "bg-slate-800 text-amber-400"}`}>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                activeTab === "gold" ? "bg-slate-950/20 text-slate-950" : "bg-amber-200/80 text-amber-950"
+              }`}>
                 {summary.gold.pledgesCount}
               </span>
             )}
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab("silver")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === "silver"
-                ? "bg-gradient-to-r from-slate-200 to-slate-400 text-slate-950 shadow-md shadow-slate-400/20"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                ? "bg-slate-800 text-white shadow-sm font-extrabold"
+                : "text-slate-700 hover:text-slate-950 hover:bg-slate-300/50"
             }`}
           >
-            <Scale className="w-4 h-4" />
+            <Scale className="h-3.5 w-3.5 text-slate-400" />
             <span>🥈 Silver Vault Stock (चांदी)</span>
             {summary?.silver?.pledgesCount !== undefined && (
-              <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === "silver" ? "bg-slate-950/20 text-slate-950 font-bold" : "bg-slate-800 text-slate-300"}`}>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                activeTab === "silver" ? "bg-white/20 text-white" : "bg-slate-300 text-slate-800"
+              }`}>
                 {summary.silver.pledgesCount}
               </span>
             )}
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab("all")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === "all"
-                ? "bg-slate-700 text-white"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                ? "bg-white text-slate-950 shadow-sm font-extrabold"
+                : "text-slate-600 hover:text-slate-950"
             }`}
           >
-            <Layers className="w-4 h-4" />
+            <Layers className="h-3.5 w-3.5" />
             <span>All Items</span>
+            {summary?.overall?.pledgesCount !== undefined && (
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                activeTab === "all" ? "bg-slate-200 text-slate-950" : "bg-slate-300/80 text-slate-700"
+              }`}>
+                {summary.overall.pledgesCount}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Audit Progress in current view */}
-        <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2">
-          <div className="text-xs text-slate-400">
-            Audit Checklist: <span className="font-semibold text-white">{verifiedInViewCount}</span> / {filteredStock.length} verified
+        {/* Audit Checklist Progress Tracker */}
+        <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-xs">
+          <div className="text-xs text-slate-600">
+            Audit Checklist: <span className="font-bold text-slate-900">{verifiedInViewCount}</span> / {filteredStock.length} verified
           </div>
-          <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
             <div
               className="h-full bg-emerald-500 transition-all duration-300"
               style={{
-                width: `${filteredStock.length > 0 ? (verifiedInViewCount / filteredStock.length) * 100 : 0}%`,
+                width: `${
+                  filteredStock.length > 0
+                    ? (verifiedInViewCount / filteredStock.length) * 100
+                    : 0
+                }%`,
               }}
             />
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 text-xs">
             <button
               onClick={checkAllVisible}
-              className="text-xs text-emerald-400 hover:underline px-1 py-0.5"
+              className="text-emerald-700 hover:text-emerald-900 font-bold hover:underline px-1 py-0.5 cursor-pointer"
               title="Mark all visible items as verified"
             >
               Check All
             </button>
-            <span className="text-slate-600">|</span>
+            <span className="text-slate-300">|</span>
             <button
               onClick={clearCheckedVisible}
-              className="text-xs text-slate-400 hover:underline px-1 py-0.5"
+              className="text-slate-500 hover:text-slate-800 font-medium hover:underline px-1 py-0.5 cursor-pointer"
               title="Uncheck all visible items"
             >
               Clear
@@ -370,16 +406,16 @@ export default function LockerStockPage() {
         </div>
       </div>
 
-      {/* Box Range Selector Bar */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3 print:hidden">
+      {/* Locker Box Range Selector Bar */}
+      <div className="rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4 space-y-3 shadow-sm print:hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-700">
               <Boxes className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-sm font-semibold text-white">Locker Box Range Filter</span>
-              <span className="text-xs text-slate-400 ml-2">(तिजोरी बॉक्स नंबर अनुसार जांच)</span>
+              <span className="text-sm font-bold text-slate-900">Locker Box Range Filter</span>
+              <span className="text-xs text-slate-500 ml-2 font-medium">(तिजोरी बॉक्स नंबर अनुसार जांच)</span>
             </div>
           </div>
 
@@ -397,10 +433,10 @@ export default function LockerStockPage() {
               <button
                 key={preset.id}
                 onClick={() => setBoxPreset(preset.id as BoxPreset)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   boxPreset === preset.id
-                    ? "bg-amber-500 text-slate-950 font-bold shadow"
-                    : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white"
+                    ? "bg-amber-600 text-white shadow-xs font-bold"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-950"
                 }`}
               >
                 {preset.label}
@@ -409,28 +445,28 @@ export default function LockerStockPage() {
           </div>
         </div>
 
-        {/* Custom Range Inputs (if CUSTOM or always available as fine tune) */}
+        {/* Custom Range Inputs (if CUSTOM is selected) */}
         {boxPreset === "CUSTOM" && (
-          <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center gap-3 animate-in fade-in duration-200">
-            <span className="text-xs text-amber-400 font-medium">Custom Box Range:</span>
+          <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center gap-3 animate-in fade-in duration-200">
+            <span className="text-xs text-amber-900 font-bold">Custom Range:</span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">From #</span>
+              <span className="text-xs text-slate-600 font-medium">From #</span>
               <Input
                 type="number"
                 placeholder="e.g. 1"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="w-28 h-8 text-xs bg-slate-800 border-slate-700 text-white"
+                className="w-28 h-8 text-xs bg-white border-slate-300 text-slate-900 font-medium"
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">To #</span>
+              <span className="text-xs text-slate-600 font-medium">To #</span>
               <Input
                 type="number"
                 placeholder="e.g. 2500"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="w-28 h-8 text-xs bg-slate-800 border-slate-700 text-white"
+                className="w-28 h-8 text-xs bg-white border-slate-300 text-slate-900 font-medium"
               />
             </div>
             {(customFrom || customTo) && (
@@ -441,7 +477,7 @@ export default function LockerStockPage() {
                   setCustomFrom("");
                   setCustomTo("");
                 }}
-                className="h-8 text-xs text-slate-400 hover:text-white"
+                className="h-8 text-xs text-slate-500 hover:text-slate-900"
               >
                 Reset Range
               </Button>
@@ -452,53 +488,68 @@ export default function LockerStockPage() {
 
       {/* KPI Summary Cards for Currently Active Filtered View */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card className="bg-slate-900 border-slate-800 text-white">
-          <CardContent className="p-4">
-            <div className="text-xs font-medium text-slate-400">Pledges in Box</div>
-            <div className="text-2xl font-bold text-amber-400 mt-1">
+        <Card className="border-slate-200 bg-white shadow-sm">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-slate-500">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Pledges in Box</span>
+              <Boxes className="h-4 w-4 text-amber-600" />
+            </div>
+            <p className="text-xl sm:text-2xl font-black text-amber-950">
               {currentViewStats.pledgesCount}
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Active packets in safe</div>
+            </p>
+            <p className="text-[10px] text-slate-500 font-medium">Active packets in safe</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 border-slate-800 text-white">
-          <CardContent className="p-4">
-            <div className="text-xs font-medium text-slate-400">Total Articles / Pcs</div>
-            <div className="text-2xl font-bold text-sky-400 mt-1">
+        <Card className="border-slate-200 bg-white shadow-sm">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-slate-500">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Total Articles / Pcs</span>
+              <Package className="h-4 w-4 text-sky-600" />
+            </div>
+            <p className="text-xl sm:text-2xl font-black text-slate-900">
               {currentViewStats.articlesCount}
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Physical ornaments</div>
+            </p>
+            <p className="text-[10px] text-slate-500 font-medium">Physical ornaments</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 border-slate-800 text-white">
-          <CardContent className="p-4">
-            <div className="text-xs font-medium text-slate-400">Gross Weight</div>
-            <div className="text-2xl font-bold text-emerald-400 mt-1">
-              {currentViewStats.totalGross} <span className="text-xs font-normal">g</span>
+        <Card className="border-slate-200 bg-white shadow-sm">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-slate-500">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Gross Weight</span>
+              <Scale className="h-4 w-4 text-emerald-600" />
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Total with stones/thread</div>
+            <p className="text-xl sm:text-2xl font-black text-emerald-900">
+              {currentViewStats.totalGross} <span className="text-xs font-normal text-slate-500">g</span>
+            </p>
+            <p className="text-[10px] text-slate-500 font-medium">Total with stones/thread</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 border-slate-800 text-white">
-          <CardContent className="p-4">
-            <div className="text-xs font-medium text-slate-400">Net Metal Weight</div>
-            <div className="text-2xl font-bold text-yellow-400 mt-1">
-              {currentViewStats.totalNet} <span className="text-xs font-normal">g</span>
+        <Card className="border-slate-200 bg-white shadow-sm">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-slate-500">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Net Metal Weight</span>
+              <Coins className="h-4 w-4 text-amber-600" />
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Pure bullion weight</div>
+            <p className="text-xl sm:text-2xl font-black text-amber-800">
+              {currentViewStats.totalNet} <span className="text-xs font-normal text-slate-500">g</span>
+            </p>
+            <p className="text-[10px] text-slate-500 font-medium">Pure bullion weight</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 border-slate-800 text-white col-span-2 md:col-span-1">
-          <CardContent className="p-4">
-            <div className="text-xs font-medium text-slate-400">Locker Loan Value</div>
-            <div className="text-2xl font-bold text-indigo-400 mt-1">
+        <Card className="border-amber-200 bg-gradient-to-br from-white to-amber-50/50 shadow-sm col-span-2 md:col-span-1">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-slate-500">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Locker Loan Value</span>
+              <Coins className="h-4 w-4 text-amber-700" />
+            </div>
+            <p className="text-xl sm:text-2xl font-black text-amber-950">
               {formatIndianCurrency(currentViewStats.totalLoan)}
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Principal in vault</div>
+            </p>
+            <p className="text-[10px] text-slate-500 font-medium">Principal in vault</p>
           </CardContent>
         </Card>
       </div>
@@ -511,69 +562,75 @@ export default function LockerStockPage() {
             placeholder="Search pledge #, customer, item..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 bg-slate-900 border-slate-800 text-white text-sm"
+            className="pl-9 bg-white border-slate-300 text-slate-900 text-xs sm:text-sm placeholder:text-slate-400"
           />
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs">
+          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 text-xs shadow-xs">
             <button
               onClick={() => setAuditFilter("all")}
-              className={`px-2.5 py-1 rounded ${
-                auditFilter === "all" ? "bg-slate-800 text-white font-medium" : "text-slate-400 hover:text-white"
+              className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
+                auditFilter === "all"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               All Items ({filteredStock.length})
             </button>
             <button
               onClick={() => setAuditFilter("unchecked")}
-              className={`px-2.5 py-1 rounded ${
-                auditFilter === "unchecked" ? "bg-amber-500/20 text-amber-300 font-medium" : "text-slate-400 hover:text-white"
+              className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
+                auditFilter === "unchecked"
+                  ? "bg-amber-100 text-amber-900 font-bold"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Pending ({filteredStock.length - verifiedInViewCount})
             </button>
             <button
               onClick={() => setAuditFilter("checked")}
-              className={`px-2.5 py-1 rounded ${
-                auditFilter === "checked" ? "bg-emerald-500/20 text-emerald-300 font-medium" : "text-slate-400 hover:text-white"
+              className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
+                auditFilter === "checked"
+                  ? "bg-emerald-100 text-emerald-900 font-bold"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Verified ({verifiedInViewCount})
             </button>
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs text-slate-400">
-            <span className="px-1 text-[11px]">Sort:</span>
+          <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs text-slate-600 shadow-xs">
+            <span className="text-[11px] font-medium">Sort:</span>
             <select
               value={sortField}
               onChange={(e) => setSortField(e.target.value as any)}
-              className="bg-transparent text-white focus:outline-none cursor-pointer text-xs"
+              className="bg-transparent text-slate-800 font-semibold focus:outline-none cursor-pointer text-xs"
             >
-              <option value="pledgeNumber" className="bg-slate-900 text-white">Pledge #</option>
-              <option value="pledgeDate" className="bg-slate-900 text-white">Date</option>
-              <option value="netWeight" className="bg-slate-900 text-white">Net Weight</option>
-              <option value="loanAmount" className="bg-slate-900 text-white">Loan Amount</option>
+              <option value="pledgeNumber">Pledge #</option>
+              <option value="pledgeDate">Date</option>
+              <option value="netWeight">Net Weight</option>
+              <option value="loanAmount">Loan Amount</option>
             </select>
             <button
               onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              className="p-1 hover:text-white"
+              className="p-1 hover:text-slate-900 cursor-pointer"
               title="Toggle sort direction"
             >
-              <ArrowUpDown className="w-3.5 h-3.5" />
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
             </button>
           </div>
         </div>
       </div>
 
       {/* Physical Audit Stock Table */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-xl">
+      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
         {/* Printable Header Info (only visible when printing) */}
         <div className="hidden print:block p-4 border-b border-black text-black">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-xl font-bold">Locker Stock Audit Sheet</h2>
-              <div className="text-xs">
+              <h2 className="text-xl font-bold">POOJA JEWELLERS - LOCKER STOCK AUDIT SHEET</h2>
+              <div className="text-xs mt-1">
                 Category: <strong>{activeTab.toUpperCase()} VAULT</strong> | 
                 Box Range: <strong>{boxPreset === "CUSTOM" ? `${customFrom || "0"} - ${customTo || "∞"}` : boxPreset}</strong>
               </div>
@@ -587,7 +644,7 @@ export default function LockerStockPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-950/70 text-slate-400 uppercase text-[11px] tracking-wider border-b border-slate-800">
+            <thead className="bg-slate-50 text-slate-600 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
               <tr>
                 <th className="py-3 px-4 w-12 text-center print:w-8">Audit</th>
                 <th className="py-3 px-4">Pledge #</th>
@@ -600,18 +657,18 @@ export default function LockerStockPage() {
                 <th className="py-3 px-4 text-center print:hidden">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-amber-500" />
-                    Scanning locker stock...
+                  <td colSpan={9} className="py-12 text-center text-slate-500">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-amber-600" />
+                    Scanning physical vault inventory...
                   </td>
                 </tr>
               ) : filteredStock.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
-                    <Boxes className="w-10 h-10 mx-auto mb-2 text-slate-600" />
+                  <td colSpan={9} className="py-12 text-center text-slate-500">
+                    <Boxes className="w-10 h-10 mx-auto mb-2 text-slate-400" />
                     No active items found in the vault matching the selected box range and filters.
                   </td>
                 </tr>
@@ -625,10 +682,10 @@ export default function LockerStockPage() {
                     <tr
                       key={item.id}
                       onClick={() => toggleCheck(item.id)}
-                      className={`cursor-pointer transition-colors group ${
+                      className={`cursor-pointer transition-colors ${
                         isChecked
-                          ? "bg-emerald-950/15 hover:bg-emerald-950/25"
-                          : "hover:bg-slate-800/40"
+                          ? "bg-emerald-50/50 hover:bg-emerald-50/80"
+                          : "hover:bg-amber-50/40"
                       }`}
                     >
                       {/* Audit Checkbox */}
@@ -636,47 +693,47 @@ export default function LockerStockPage() {
                         <button
                           type="button"
                           onClick={() => toggleCheck(item.id)}
-                          className="focus:outline-none transition-transform active:scale-90"
+                          className="focus:outline-none transition-transform active:scale-90 cursor-pointer"
                         >
                           {isChecked ? (
-                            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                           ) : (
-                            <Circle className="w-5 h-5 text-slate-600 hover:text-slate-400" />
+                            <Circle className="w-5 h-5 text-slate-300 hover:text-slate-500" />
                           )}
                         </button>
                       </td>
 
                       {/* Pledge Number */}
-                      <td className="py-3 px-4 font-mono font-bold text-white whitespace-nowrap">
+                      <td className="py-3 px-4 font-mono font-bold text-slate-900 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
-                          <span className={isSilver ? "text-slate-300" : "text-amber-400"}>
+                          <span className={isSilver ? "text-slate-800" : "text-amber-900 font-extrabold"}>
                             {item.pledgeNumber}
                           </span>
                           <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded font-normal ${
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider ${
                               isSilver
-                                ? "bg-slate-800 text-slate-300 border border-slate-700"
-                                : "bg-amber-500/10 text-amber-300 border border-amber-500/20"
+                                ? "bg-slate-200 text-slate-800 border border-slate-300"
+                                : "bg-amber-100 text-amber-900 border border-amber-300"
                             }`}
                           >
-                            {isSilver ? "SILVER" : "GOLD"}
+                            {isSilver ? "🥈 Silver" : "🪙 Gold"}
                           </span>
                         </div>
                       </td>
 
                       {/* Customer */}
-                      <td className="py-3 px-4 text-slate-200">
-                        <div className="font-medium text-slate-100">{item.customer?.name || "—"}</div>
+                      <td className="py-3 px-4 text-slate-900">
+                        <div className="font-semibold text-slate-900">{item.customer?.name || "—"}</div>
                         {item.customer?.mobileNumber && (
-                          <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                            <Phone className="w-3 h-3 text-slate-500" />
+                          <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
+                            <Phone className="w-3 h-3 text-slate-400" />
                             {item.customer.mobileNumber}
                           </div>
                         )}
                       </td>
 
                       {/* Date */}
-                      <td className="py-3 px-4 text-slate-400 whitespace-nowrap text-xs">
+                      <td className="py-3 px-4 text-slate-600 whitespace-nowrap text-xs font-medium">
                         {item.pledgeDate
                           ? new Date(item.pledgeDate).toLocaleDateString("en-IN", {
                               day: "2-digit",
@@ -687,40 +744,40 @@ export default function LockerStockPage() {
                       </td>
 
                       {/* Articles description */}
-                      <td className="py-3 px-4 text-slate-300">
+                      <td className="py-3 px-4 text-slate-800">
                         {articles.length > 0 ? (
                           <div className="space-y-1">
                             {articles.map((art: any, idx: number) => (
                               <div key={idx} className="text-xs flex items-center gap-2">
-                                <span className="font-medium text-white">{art.articleName}</span>
-                                <span className="text-slate-400">× {art.quantity || 1}</span>
+                                <span className="font-semibold text-slate-900">{art.articleName}</span>
+                                <span className="text-slate-500">× {art.quantity || 1}</span>
                                 {art.netWeight && (
-                                  <span className="text-slate-500 text-[11px]">({art.netWeight}g)</span>
+                                  <span className="text-amber-800 font-medium text-[11px]">({art.netWeight}g)</span>
                                 )}
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <span className="text-slate-400 text-xs">
+                          <span className="text-slate-500 text-xs">
                             {item.totalArticlesCount || 1} Item(s)
                           </span>
                         )}
                       </td>
 
                       {/* Gross Weight */}
-                      <td className="py-3 px-4 text-right font-mono text-slate-300 whitespace-nowrap">
+                      <td className="py-3 px-4 text-right font-mono text-slate-700 whitespace-nowrap font-medium">
                         {parseFloat(item.totalGrossWeight || "0").toFixed(3)} g
                       </td>
 
                       {/* Net Weight */}
                       <td className="py-3 px-4 text-right font-mono font-bold whitespace-nowrap">
-                        <span className={isSilver ? "text-slate-200" : "text-amber-300"}>
+                        <span className={isSilver ? "text-slate-800 font-extrabold" : "text-amber-800 font-black"}>
                           {parseFloat(item.totalNetWeight || "0").toFixed(3)} g
                         </span>
                       </td>
 
                       {/* Loan Amount */}
-                      <td className="py-3 px-4 text-right font-mono font-semibold text-white whitespace-nowrap">
+                      <td className="py-3 px-4 text-right font-mono font-black text-emerald-800 whitespace-nowrap">
                         {formatIndianCurrency(parseFloat(item.totalLoanAmount || "0"))}
                       </td>
 
@@ -729,10 +786,10 @@ export default function LockerStockPage() {
                         <Link
                           href={`/dashboard/girvi/${item.id}`}
                           target="_blank"
-                          className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 hover:underline px-2 py-1 rounded bg-slate-800/60"
+                          className="inline-flex items-center gap-1 text-xs text-amber-800 hover:text-amber-950 hover:underline px-2.5 py-1 rounded bg-amber-50 border border-amber-200 font-semibold"
                         >
                           View
-                          <ExternalLink className="w-3 h-3" />
+                          <ExternalLink className="w-3 h-3 text-amber-700" />
                         </Link>
                       </td>
                     </tr>

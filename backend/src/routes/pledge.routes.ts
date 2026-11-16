@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { pledges, pledgeArticles, customers, businessSettings, payments } from '../db/schema.js';
-import { eq, ne, or, ilike, sql, desc, and } from 'drizzle-orm';
+import { eq, ne, or, ilike, sql, desc, and, inArray } from 'drizzle-orm';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { requireRole } from '../middlewares/role.middleware.js';
 import { PledgeNumberService } from '../services/pledge-number.service.js';
