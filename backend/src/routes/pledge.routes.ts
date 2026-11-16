@@ -108,9 +108,10 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
         limit?: string;
       };
 
-      const page = Math.max(1, parseInt(query.page || '1', 10));
-      const limit = Math.min(100, Math.max(1, parseInt(query.limit || '20', 10)));
-      const offset = (page - 1) * limit;
+      const isAll = query.limit === 'all' || query.limit === '-1' || (parseInt(query.limit || '', 10) >= 1000);
+      const page = isAll ? 1 : Math.max(1, parseInt(query.page || '1', 10));
+      const limit = isAll ? 5000 : Math.min(5000, Math.max(1, parseInt(query.limit || '1000', 10)));
+      const offset = isAll ? 0 : (page - 1) * limit;
 
       const conditions = [];
 

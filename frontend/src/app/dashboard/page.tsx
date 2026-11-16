@@ -120,7 +120,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Total Active Girvi */}
-        <Link href="/dashboard/girvi" className="block">
+        <Link href="/dashboard/girvi?status=active" className="block">
           <Card className="rounded-2xl border-slate-200/90 shadow-sm p-4 relative overflow-hidden bg-white hover:border-amber-400 hover:shadow-md transition-all cursor-pointer">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -131,7 +131,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <p className="text-2xl sm:text-3xl font-black text-amber-900 mt-2">{s.totalActiveGirvi}</p>
-            <span className="text-[10px] text-amber-700 font-medium">Open in Active Ledger &rarr;</span>
+            <span className="text-[10px] text-amber-700 font-medium">Open in Girvi Ledger &rarr;</span>
           </Card>
         </Link>
 
@@ -232,7 +232,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Total Closed Girvi */}
-        <Link href="/dashboard/girvi/released" className="block">
+        <Link href="/dashboard/girvi?status=closed" className="block">
           <Card className="rounded-2xl border-slate-200/90 shadow-sm p-4 relative overflow-hidden bg-white hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -243,7 +243,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">{s.totalClosedGirvi}</p>
-            <span className="text-[10px] text-emerald-700 font-medium">Open in Released Ledger &rarr;</span>
+            <span className="text-[10px] text-emerald-700 font-medium">Open in Girvi Ledger &rarr;</span>
           </Card>
         </Link>
       </div>
