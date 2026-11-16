@@ -30,19 +30,40 @@ import {
   Phone,
   User,
   Check,
+  Bookmark,
 } from "lucide-react";
 
 type MetalTab = "gold" | "silver" | "all";
-type BoxPreset = "ALL" | "1-2000" | "2001-3000" | "3001-4000" | "4001-5000" | "5001-6000" | "CUSTOM";
+type BoxPreset =
+  | "ALL"
+  | "1-2000"
+  | "2001-3000"
+  | "3001-4000"
+  | "4001-5000"
+  | "5001-6000"
+  | "7001-8000"
+  | "8001-9000"
+  | "9001-10000"
+  | "CUSTOM";
 type AuditFilter = "all" | "checked" | "unchecked";
 
-// Extract numeric integer digits from pledge numbers like "C4767", "4767", "G-102"
-function extractPledgeNumber(pledgeNum?: string | null): number | null {
-  if (!pledgeNum) return null;
-  const digitsOnly = pledgeNum.replace(/\D/g, "");
-  if (!digitsOnly) return null;
-  const val = parseInt(digitsOnly, 10);
-  return isNaN(val) ? null : val;
+// Parse pledge numbers like "B7289", "C4256", "C-100", "7289" into prefix and integer number
+function parsePledgeId(pledgeNum?: string | null): { prefix: string; num: number | null } {
+  if (!pledgeNum) return { prefix: "", num: null };
+  const trimmed = pledgeNum.trim();
+  const match = trimmed.match(/^([A-Za-z]+)?\s*[-/]?\s*(\d+)/);
+  if (!match) {
+    const digitsOnly = trimmed.replace(/\D/g, "");
+    const alphaOnly = trimmed.replace(/[^A-Za-z]/g, "").toUpperCase();
+    return {
+      prefix: alphaOnly,
+      num: digitsOnly ? parseInt(digitsOnly, 10) : null,
+    };
+  }
+  return {
+    prefix: (match[1] || "").toUpperCase(),
+    num: match[2] ? parseInt(match[2], 10) : null,
+  };
 }
 
 export default function LockerStockPage() {
@@ -52,6 +73,7 @@ export default function LockerStockPage() {
 
   // Filters
   const [activeTab, setActiveTab] = useState<MetalTab>("gold");
+  const [selectedSeries, setSelectedSeries] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [boxPreset, setBoxPreset] = useState<BoxPreset>("ALL");
   const [customFrom, setCustomFrom] = useState<string>("");
@@ -88,24 +110,52 @@ export default function LockerStockPage() {
     fetchStock();
   }, []);
 
-  // Handle Box Range extraction
-  const boxRange = useMemo<{ from: number | null; to: number | null }>(() => {
-    if (boxPreset === "ALL") return { from: null, to: null };
-    if (boxPreset === "1-2000") return { from: 1, to: 2000 };
-    if (boxPreset === "2001-3000") return { from: 2001, to: 3000 };
-    if (boxPreset === "3001-4000") return { from: 3001, to: 4000 };
-    if (boxPreset === "4001-5000") return { from: 4001, to: 5000 };
-    if (boxPreset === "5001-6000") return { from: 5001, to: 6000 };
-    if (boxPreset === "CUSTOM") {
-      const f = customFrom ? parseInt(customFrom, 10) : null;
-      const t = customTo ? parseInt(customTo, 10) : null;
-      return {
-        from: isNaN(f as number) ? null : f,
-        to: isNaN(t as number) ? null : t,
-      };
+  // Dynamically extract all available series/letter prefixes from active stock
+  const availableSeries = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of stockData) {
+      const { prefix } = parsePledgeId(item.pledgeNumber);
+      const key = prefix || "Others";
+      map.set(key, (map.get(key) || 0) + 1);
     }
-    return { from: null, to: null };
-  }, [boxPreset, customFrom, customTo]);
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [stockData]);
+
+  // Determine preset box pills based on the currently selected series
+  const relevantPresets = useMemo<{ id: BoxPreset; label: string }[]>(() => {
+    if (selectedSeries === "B") {
+      return [
+        { id: "ALL", label: "All B Boxes" },
+        { id: "7001-8000", label: "B 7001 - 8000" },
+        { id: "8001-9000", label: "B 8001 - 9000" },
+        { id: "9001-10000", label: "B 9001 - 10000" },
+        { id: "CUSTOM", label: "Custom Range..." },
+      ];
+    }
+    if (selectedSeries === "C") {
+      return [
+        { id: "ALL", label: "All C Boxes" },
+        { id: "1-2000", label: "C 1 - 2000" },
+        { id: "2001-3000", label: "C 2001 - 3000" },
+        { id: "3001-4000", label: "C 3001 - 4000" },
+        { id: "4001-5000", label: "C 4001 - 5000" },
+        { id: "5001-6000", label: "C 5001 - 6000" },
+        { id: "CUSTOM", label: "Custom Range..." },
+      ];
+    }
+    // Overall / All Series
+    return [
+      { id: "ALL", label: "All Boxes" },
+      { id: "1-2000", label: "Box 1 - 2000" },
+      { id: "2001-3000", label: "Box 2001 - 3000" },
+      { id: "3001-4000", label: "Box 3001 - 4000" },
+      { id: "4001-5000", label: "Box 4001 - 5000" },
+      { id: "5001-6000", label: "Box 5001 - 6000" },
+      { id: "7001-8000", label: "Box 7001 - 8000" },
+      { id: "8001-9000", label: "Box 8001 - 9000" },
+      { id: "CUSTOM", label: "Custom Range..." },
+    ];
+  }, [selectedSeries]);
 
   // Filtered and Sorted Stock
   const filteredStock = useMemo(() => {
@@ -118,17 +168,51 @@ export default function LockerStockPage() {
           if (item.metalType !== "Silver") return false;
         }
 
-        // 2. Box Range Filter
-        if (boxRange.from !== null || boxRange.to !== null) {
-          const num = extractPledgeNumber(item.pledgeNumber);
-          if (num === null) {
+        const itemParsed = parsePledgeId(item.pledgeNumber);
+
+        // 2. Series / Alphabet Prefix Filter
+        if (selectedSeries !== "ALL") {
+          if (itemParsed.prefix !== selectedSeries) {
             return false;
           }
-          if (boxRange.from !== null && num < boxRange.from) return false;
-          if (boxRange.to !== null && num > boxRange.to) return false;
         }
 
-        // 3. Search query
+        // 3. Box Range Filter (Presets & Custom)
+        if (boxPreset === "1-2000") {
+          if (itemParsed.num === null || itemParsed.num < 1 || itemParsed.num > 2000) return false;
+        } else if (boxPreset === "2001-3000") {
+          if (itemParsed.num === null || itemParsed.num < 2001 || itemParsed.num > 3000) return false;
+        } else if (boxPreset === "3001-4000") {
+          if (itemParsed.num === null || itemParsed.num < 3001 || itemParsed.num > 4000) return false;
+        } else if (boxPreset === "4001-5000") {
+          if (itemParsed.num === null || itemParsed.num < 4001 || itemParsed.num > 5000) return false;
+        } else if (boxPreset === "5001-6000") {
+          if (itemParsed.num === null || itemParsed.num < 5001 || itemParsed.num > 6000) return false;
+        } else if (boxPreset === "7001-8000") {
+          if (itemParsed.num === null || itemParsed.num < 7001 || itemParsed.num > 8000) return false;
+        } else if (boxPreset === "8001-9000") {
+          if (itemParsed.num === null || itemParsed.num < 8001 || itemParsed.num > 9000) return false;
+        } else if (boxPreset === "9001-10000") {
+          if (itemParsed.num === null || itemParsed.num < 9001 || itemParsed.num > 10000) return false;
+        } else if (boxPreset === "CUSTOM") {
+          const fromParsed = parsePledgeId(customFrom);
+          const toParsed = parsePledgeId(customTo);
+
+          // If the user typed an alphabet prefix in custom input (e.g. "B" or "C")
+          const inputPrefix = fromParsed.prefix || toParsed.prefix;
+          if (inputPrefix && itemParsed.prefix !== inputPrefix) {
+            return false;
+          }
+
+          if (fromParsed.num !== null && (itemParsed.num === null || itemParsed.num < fromParsed.num)) {
+            return false;
+          }
+          if (toParsed.num !== null && (itemParsed.num === null || itemParsed.num > toParsed.num)) {
+            return false;
+          }
+        }
+
+        // 4. Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase().trim();
           const pledgeNo = (item.pledgeNumber || "").toLowerCase();
@@ -148,7 +232,7 @@ export default function LockerStockPage() {
           }
         }
 
-        // 4. Physical Audit Check status filter
+        // 5. Physical Audit Check status filter
         const isChecked = checkedIds.has(item.id);
         if (auditFilter === "checked" && !isChecked) return false;
         if (auditFilter === "unchecked" && isChecked) return false;
@@ -158,9 +242,13 @@ export default function LockerStockPage() {
       .sort((a, b) => {
         let comp = 0;
         if (sortField === "pledgeNumber") {
-          const numA = extractPledgeNumber(a.pledgeNumber) || 0;
-          const numB = extractPledgeNumber(b.pledgeNumber) || 0;
-          comp = numA - numB;
+          const pA = parsePledgeId(a.pledgeNumber);
+          const pB = parsePledgeId(b.pledgeNumber);
+          if (pA.prefix !== pB.prefix) {
+            comp = pA.prefix.localeCompare(pB.prefix);
+          } else {
+            comp = (pA.num || 0) - (pB.num || 0);
+          }
         } else if (sortField === "pledgeDate") {
           comp =
             new Date(a.pledgeDate || a.createdAt).getTime() -
@@ -179,7 +267,10 @@ export default function LockerStockPage() {
   }, [
     stockData,
     activeTab,
-    boxRange,
+    selectedSeries,
+    boxPreset,
+    customFrom,
+    customTo,
     searchQuery,
     auditFilter,
     checkedIds,
@@ -276,7 +367,7 @@ export default function LockerStockPage() {
             size="sm"
             onClick={fetchStock}
             disabled={isLoading}
-            className="gap-1.5 text-xs text-slate-700 border-slate-300 hover:bg-slate-100 font-semibold"
+            className="gap-1.5 text-xs text-slate-700 border-slate-300 hover:bg-slate-100 font-semibold cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
@@ -286,7 +377,7 @@ export default function LockerStockPage() {
             variant="outline"
             size="sm"
             onClick={() => window.print()}
-            className="gap-1.5 text-xs text-amber-900 border-amber-300 bg-amber-50 hover:bg-amber-100 font-semibold shadow-xs"
+            className="gap-1.5 text-xs text-amber-900 border-amber-300 bg-amber-50 hover:bg-amber-100 font-semibold shadow-xs cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5 text-amber-700" />
             Print Stock Sheet
@@ -407,32 +498,77 @@ export default function LockerStockPage() {
       </div>
 
       {/* Locker Box Range Selector Bar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4 space-y-3 shadow-sm print:hidden">
+      <div className="rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4 space-y-3.5 shadow-sm print:hidden">
+        {/* Row 1: Series / Alphabet Prefix Selector (B, C, etc.) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Bookmark className="w-4 h-4 text-amber-600" />
+            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Pledge Book / Series (सीरीज़ अक्षर):
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSeries("ALL");
+                setBoxPreset("ALL");
+              }}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedSeries === "ALL"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              All Series (सभी)
+            </button>
+
+            {availableSeries.map(([seriesKey, count]) => (
+              <button
+                key={seriesKey}
+                type="button"
+                onClick={() => {
+                  setSelectedSeries(seriesKey);
+                  setBoxPreset("ALL");
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  selectedSeries === seriesKey
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100"
+                }`}
+              >
+                <span>Series {seriesKey}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  selectedSeries === seriesKey ? "bg-white/20 text-white" : "bg-amber-200/80 text-amber-950 font-bold"
+                }`}>
+                  {count}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Row 2: Box Range Presets */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-700">
               <Boxes className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-sm font-bold text-slate-900">Locker Box Range Filter</span>
+              <span className="text-sm font-bold text-slate-900">
+                {selectedSeries !== "ALL" ? `Series ${selectedSeries} Box Filter` : "Locker Box Range Filter"}
+              </span>
               <span className="text-xs text-slate-500 ml-2 font-medium">(तिजोरी बॉक्स नंबर अनुसार जांच)</span>
             </div>
           </div>
 
-          {/* Quick Box Range Preset Pills */}
+          {/* Preset Pills */}
           <div className="flex flex-wrap items-center gap-1.5">
-            {[
-              { id: "ALL", label: "All Boxes" },
-              { id: "1-2000", label: "Box 1 - 2000" },
-              { id: "2001-3000", label: "Box 2001 - 3000" },
-              { id: "3001-4000", label: "Box 3001 - 4000" },
-              { id: "4001-5000", label: "Box 4001 - 5000" },
-              { id: "5001-6000", label: "Box 5001 - 6000" },
-              { id: "CUSTOM", label: "Custom Range..." },
-            ].map((preset) => (
+            {relevantPresets.map((preset) => (
               <button
                 key={preset.id}
-                onClick={() => setBoxPreset(preset.id as BoxPreset)}
+                onClick={() => setBoxPreset(preset.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   boxPreset === preset.id
                     ? "bg-amber-600 text-white shadow-xs font-bold"
@@ -445,30 +581,33 @@ export default function LockerStockPage() {
           </div>
         </div>
 
-        {/* Custom Range Inputs (if CUSTOM is selected) */}
+        {/* Row 3: Custom Range Inputs (Accepts full strings like B7000 or 1) */}
         {boxPreset === "CUSTOM" && (
           <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center gap-3 animate-in fade-in duration-200">
-            <span className="text-xs text-amber-900 font-bold">Custom Range:</span>
+            <span className="text-xs text-amber-900 font-bold">Custom Range (अक्षर सहित नंबर):</span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-600 font-medium">From #</span>
+              <span className="text-xs text-slate-600 font-medium">From</span>
               <Input
-                type="number"
-                placeholder="e.g. 1"
+                type="text"
+                placeholder="e.g. B7000, C4001, 1"
                 value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="w-28 h-8 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                onChange={(e) => setCustomFrom(e.target.value.toUpperCase())}
+                className="w-36 h-8 text-xs bg-white border-slate-300 text-slate-900 font-semibold"
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-600 font-medium">To #</span>
+              <span className="text-xs text-slate-600 font-medium">To</span>
               <Input
-                type="number"
-                placeholder="e.g. 2500"
+                type="text"
+                placeholder="e.g. B8000, C5000, 2500"
                 value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="w-28 h-8 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                onChange={(e) => setCustomTo(e.target.value.toUpperCase())}
+                className="w-36 h-8 text-xs bg-white border-slate-300 text-slate-900 font-semibold"
               />
             </div>
+            <span className="text-[11px] text-slate-500 italic">
+              💡 Supports alphabet prefixes like B7289, C4256 or numbers like 1 - 2000
+            </span>
             {(customFrom || customTo) && (
               <Button
                 variant="ghost"
@@ -477,7 +616,7 @@ export default function LockerStockPage() {
                   setCustomFrom("");
                   setCustomTo("");
                 }}
-                className="h-8 text-xs text-slate-500 hover:text-slate-900"
+                className="h-8 text-xs text-slate-500 hover:text-slate-900 cursor-pointer"
               >
                 Reset Range
               </Button>
@@ -497,7 +636,9 @@ export default function LockerStockPage() {
             <p className="text-xl sm:text-2xl font-black text-amber-950">
               {currentViewStats.pledgesCount}
             </p>
-            <p className="text-[10px] text-slate-500 font-medium">Active packets in safe</p>
+            <p className="text-[10px] text-slate-500 font-medium">
+              {selectedSeries !== "ALL" ? `Series ${selectedSeries} packets` : "Active packets in safe"}
+            </p>
           </CardContent>
         </Card>
 
@@ -607,7 +748,7 @@ export default function LockerStockPage() {
               onChange={(e) => setSortField(e.target.value as any)}
               className="bg-transparent text-slate-800 font-semibold focus:outline-none cursor-pointer text-xs"
             >
-              <option value="pledgeNumber">Pledge #</option>
+              <option value="pledgeNumber">Pledge # (Letter & No)</option>
               <option value="pledgeDate">Date</option>
               <option value="netWeight">Net Weight</option>
               <option value="loanAmount">Loan Amount</option>
@@ -632,6 +773,7 @@ export default function LockerStockPage() {
               <h2 className="text-xl font-bold">POOJA JEWELLERS - LOCKER STOCK AUDIT SHEET</h2>
               <div className="text-xs mt-1">
                 Category: <strong>{activeTab.toUpperCase()} VAULT</strong> | 
+                Series: <strong>{selectedSeries}</strong> | 
                 Box Range: <strong>{boxPreset === "CUSTOM" ? `${customFrom || "0"} - ${customTo || "∞"}` : boxPreset}</strong>
               </div>
             </div>
@@ -669,7 +811,7 @@ export default function LockerStockPage() {
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-slate-500">
                     <Boxes className="w-10 h-10 mx-auto mb-2 text-slate-400" />
-                    No active items found in the vault matching the selected box range and filters.
+                    No active items found in the vault matching the selected series, box range, and filters.
                   </td>
                 </tr>
               ) : (
@@ -786,7 +928,7 @@ export default function LockerStockPage() {
                         <Link
                           href={`/dashboard/girvi/${item.id}`}
                           target="_blank"
-                          className="inline-flex items-center gap-1 text-xs text-amber-800 hover:text-amber-950 hover:underline px-2.5 py-1 rounded bg-amber-50 border border-amber-200 font-semibold"
+                          className="inline-flex items-center gap-1 text-xs text-amber-800 hover:text-amber-950 hover:underline px-2.5 py-1 rounded bg-amber-50 border border-amber-200 font-semibold cursor-pointer"
                         >
                           View
                           <ExternalLink className="w-3 h-3 text-amber-700" />
