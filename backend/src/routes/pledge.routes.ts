@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { pledges, pledgeArticles, customers, businessSettings, payments } from '../db/schema.js';
-import { eq, or, ilike, sql, desc, and } from 'drizzle-orm';
+import { eq, ne, or, ilike, sql, desc, and } from 'drizzle-orm';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { requireRole } from '../middlewares/role.middleware.js';
 import { PledgeNumberService } from '../services/pledge-number.service.js';
@@ -115,7 +115,13 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
       const conditions = [];
 
       if (query.status && query.status !== 'all') {
-        conditions.push(eq(pledges.status, query.status));
+        if (query.status === 'closed' || query.status === 'released') {
+          conditions.push(or(eq(pledges.status, 'closed'), sql`${pledges.closedDate} IS NOT NULL`));
+        } else if (query.status === 'active') {
+          conditions.push(and(ne(pledges.status, 'closed'), sql`${pledges.closedDate} IS NULL`));
+        } else {
+          conditions.push(eq(pledges.status, query.status));
+        }
       }
 
       if (query.metalType && query.metalType !== 'all') {

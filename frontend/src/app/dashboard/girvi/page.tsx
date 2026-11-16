@@ -18,13 +18,15 @@ import {
   Printer,
   Sparkles,
   Coins,
+  CheckCircle2,
+  Vault,
 } from "lucide-react";
 
-export default function GirviListPage() {
+export default function ActiveGirviListPage() {
   const [pledges, setPledges] = useState<Pledge[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("active");
   const [metalFilter, setMetalFilter] = useState<"all" | "Gold" | "Silver">("all");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -39,7 +41,7 @@ export default function GirviListPage() {
     try {
       const res = await api.getPledges({
         search: search.trim() || undefined,
-        status: statusFilter !== "all" ? statusFilter : undefined,
+        status: statusFilter,
         metalType: metalFilter !== "all" ? metalFilter : undefined,
         page,
         limit: 15,
@@ -51,7 +53,7 @@ export default function GirviListPage() {
         setTotalCount(res.pagination.total || 0);
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to load pledges.");
+      toast.error(err.message || "Failed to load active pledges.");
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +62,7 @@ export default function GirviListPage() {
   const getStatusBadge = (status: PledgeStatus) => {
     switch (status) {
       case "active":
-        return <Badge variant="default" className="bg-[#0F1E36]">Active</Badge>;
+        return <Badge variant="default" className="bg-[#0F1E36]">Active in Vault</Badge>;
       case "due_soon":
         return <Badge variant="warning">Due Soon</Badge>;
       case "overdue":
@@ -77,20 +79,34 @@ export default function GirviListPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Girvi Pawn Pledges Ledger
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500">
-            Total {totalCount} registered pawn pledges in vault records
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700">
+              <Vault className="h-4 w-4" />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              Active Girvi Ledger (चालू गिरवी)
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Total {totalCount} open jewellery pledges currently secured in vault
           </p>
         </div>
 
-        <Link href="/dashboard/girvi/new">
-          <Button variant="gold" size="sm" className="gap-2 font-semibold shadow-sm">
-            <PlusCircle className="h-4 w-4" />
-            New Girvi Entry
-          </Button>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link href="/dashboard/girvi/released">
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs text-emerald-800 border-emerald-300 hover:bg-emerald-50">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+              <span>Released Ledger &rarr;</span>
+            </Button>
+          </Link>
+
+          <Link href="/dashboard/girvi/new">
+            <Button variant="gold" size="sm" className="gap-2 font-semibold shadow-sm text-xs">
+              <PlusCircle className="h-4 w-4" />
+              New Girvi Entry
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Metal Separation Tabs (Gold vs Silver) */}
@@ -107,7 +123,7 @@ export default function GirviListPage() {
               : "text-slate-600 hover:text-slate-950"
           }`}
         >
-          All Pledges
+          All Active
         </button>
 
         <button
@@ -123,7 +139,7 @@ export default function GirviListPage() {
           }`}
         >
           <Sparkles className="h-3.5 w-3.5 text-amber-700" />
-          <span>Gold Girvi (सोना)</span>
+          <span>Active Gold (सोना)</span>
         </button>
 
         <button
@@ -139,7 +155,7 @@ export default function GirviListPage() {
           }`}
         >
           <Coins className="h-3.5 w-3.5 text-slate-400" />
-          <span>Silver Girvi (चांदी)</span>
+          <span>Active Silver (चांदी)</span>
         </button>
       </div>
 
@@ -149,7 +165,7 @@ export default function GirviListPage() {
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search by Pledge # (e.g. C4678), Customer Name, Mobile..."
+              placeholder="Search active pledge # (e.g. C4682), customer name, mobile..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -167,13 +183,11 @@ export default function GirviListPage() {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="flex h-10 w-full sm:w-44 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              className="flex h-10 w-full sm:w-48 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
-              <option value="all">All Statuses</option>
-              <option value="active">Active Only</option>
+              <option value="active">All Active in Vault</option>
               <option value="due_soon">Due Soon (&le; 15 days)</option>
               <option value="overdue">Overdue Pledges</option>
-              <option value="closed">Closed / Redeemed</option>
             </select>
           </div>
         </div>
@@ -203,14 +217,14 @@ export default function GirviListPage() {
                     <td colSpan={9} className="py-12 text-center text-slate-500">
                       <div className="flex flex-col items-center gap-2">
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
-                        <span>Searching database records...</span>
+                        <span>Searching active vault records...</span>
                       </div>
                     </td>
                   </tr>
                 ) : pledges.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-12 text-center text-slate-500">
-                      No pledges found matching your criteria.
+                      No active pledges found matching your criteria.
                     </td>
                   </tr>
                 ) : (

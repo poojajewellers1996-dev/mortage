@@ -120,18 +120,20 @@ export default function DashboardPage() {
         </Card>
 
         {/* Total Active Girvi */}
-        <Card className="rounded-2xl border-slate-200/90 shadow-sm p-4 relative overflow-hidden bg-white">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Active Girvi
-            </span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
-              <ShieldCheck className="h-4 w-4" />
+        <Link href="/dashboard/girvi" className="block">
+          <Card className="rounded-2xl border-slate-200/90 shadow-sm p-4 relative overflow-hidden bg-white hover:border-amber-400 hover:shadow-md transition-all cursor-pointer">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Active Girvi
+              </span>
+              <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
             </div>
-          </div>
-          <p className="text-2xl sm:text-3xl font-black text-amber-900 mt-2">{s.totalActiveGirvi}</p>
-          <span className="text-[10px] text-slate-400">Vault Pledges Currently Open</span>
-        </Card>
+            <p className="text-2xl sm:text-3xl font-black text-amber-900 mt-2">{s.totalActiveGirvi}</p>
+            <span className="text-[10px] text-amber-700 font-medium">Open in Active Ledger &rarr;</span>
+          </Card>
+        </Link>
 
         {/* Total Loan Amount Outstanding */}
         <Card className="rounded-2xl border-emerald-200 bg-emerald-50/40 shadow-sm p-4 relative overflow-hidden">
@@ -230,18 +232,20 @@ export default function DashboardPage() {
         </Card>
 
         {/* Total Closed Girvi */}
-        <Card className="rounded-2xl border-slate-200/90 shadow-sm p-4 relative overflow-hidden bg-white">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Redeemed & Closed
-            </span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-              <CheckCircle2 className="h-4 w-4" />
+        <Link href="/dashboard/girvi/released" className="block">
+          <Card className="rounded-2xl border-slate-200/90 shadow-sm p-4 relative overflow-hidden bg-white hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Redeemed & Closed
+              </span>
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
             </div>
-          </div>
-          <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">{s.totalClosedGirvi}</p>
-          <span className="text-[10px] text-slate-400">Successfully Released Pledges</span>
-        </Card>
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">{s.totalClosedGirvi}</p>
+            <span className="text-[10px] text-emerald-700 font-medium">Open in Released Ledger &rarr;</span>
+          </Card>
+        </Link>
       </div>
 
       {/* Analytics Charts Section */}
