@@ -1,0 +1,26 @@
+{
+  "name": "girvi-management-system",
+  "version": "1.0.0",
+  "description": "Enterprise Girvi Management System for Jewellery & Pawn Business",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "db:migrate": "cd backend && npm run db:migrate",
+    "db:seed": "cd backend && npm run db:seed"
+  },
+  "keywords": [
+    "girvi",
+    "pawn-broker",
+    "gold-loan",
+    "jewellery",
+    "nextjs",
+    "fastify",
+    "supabase",
+    "drizzle"
+  ],
+  "author": "Shree Ganesh Jewellers & Bankers",
+  "license": "Proprietary"
+}
