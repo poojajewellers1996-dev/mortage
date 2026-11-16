@@ -30,8 +30,8 @@ export const customers = pgTable('customers', {
   name: varchar('name', { length: 255 }).notNull(),
   relationType: varchar('relation_type', { length: 20 }).notNull().default('S/O'), // 'S/O' | 'D/O' | 'W/O' | 'C/O' | 'O'
   relationName: varchar('relation_name', { length: 255 }),
-  mobileNumber: varchar('mobile_number', { length: 20 }).notNull(),
-  secondaryMobile: varchar('secondary_mobile', { length: 20 }),
+  mobileNumber: varchar('mobile_number', { length: 30 }),
+  secondaryMobile: varchar('secondary_mobile', { length: 30 }),
   email: varchar('email', { length: 255 }),
   monthlyIncome: numeric('monthly_income', { precision: 14, scale: 2 }).default('0.00'),
   address: text('address').notNull(),

@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { businessSettings } from '../db/schema.js';
+import { sql, eq } from 'drizzle-orm';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { requireRole } from '../middlewares/role.middleware.js';
 import { AuditService } from '../services/audit.service.js';

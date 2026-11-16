@@ -81,8 +81,8 @@ export async function uploadRoutes(fastify: FastifyInstance) {
             mimeType: uploadResult.mimeType,
             uploadedBy: request.user?.id || null,
           });
-        } catch (dbErr) {
-          request.log.warn('Could not record storage document to DB:', dbErr);
+        } catch (dbErr: any) {
+          request.log.warn(`Could not record storage document to DB: ${dbErr?.message || dbErr}`);
         }
       }
 

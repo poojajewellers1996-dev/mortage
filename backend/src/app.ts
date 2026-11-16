@@ -99,7 +99,7 @@ export function buildApp(): FastifyInstance {
   app.register(settingsRoutes, { prefix: '/api/settings' });
 
   // Centralized Error Handler
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: any, request, reply) => {
     app.log.error(error);
     const statusCode = error.statusCode || 500;
     reply.status(statusCode).send({

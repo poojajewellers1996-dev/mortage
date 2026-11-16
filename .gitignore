@@ -6,6 +6,7 @@ build/
 .env.local
 .env.production
 *.log
+*.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

@@ -11,7 +11,7 @@ const customerSchema = z.object({
   name: z.string().min(2, 'Customer name must be at least 2 characters'),
   relationType: z.enum(['S/O', 'D/O', 'W/O', 'C/O', 'O']).default('S/O'),
   relationName: z.string().optional().nullable(),
-  mobileNumber: z.string().regex(/^[0-9+ -]{10,15}$/, 'Invalid Indian mobile number format'),
+  mobileNumber: z.string().optional().nullable().or(z.literal('')),
   secondaryMobile: z.string().optional().nullable(),
   email: z.string().email().optional().nullable().or(z.literal('')),
   monthlyIncome: z.union([z.number(), z.string()]).transform(v => String(v || 0)),
@@ -148,19 +148,21 @@ export async function customerRoutes(fastify: FastifyInstance) {
     const data = parseResult.data;
 
     try {
-      // Check for existing customer with same mobile
-      const existing = await db
-        .select()
-        .from(customers)
-        .where(eq(customers.mobileNumber, data.mobileNumber.trim()))
-        .limit(1);
+      // Check for existing customer with same mobile if provided
+      if (data.mobileNumber && data.mobileNumber.trim()) {
+        const existing = await db
+          .select()
+          .from(customers)
+          .where(eq(customers.mobileNumber, data.mobileNumber.trim()))
+          .limit(1);
 
-      if (existing.length > 0) {
-        return reply.status(409).send({
-          success: false,
-          error: `A customer with mobile number ${data.mobileNumber} already exists (${existing[0].name}).`,
-          existingCustomer: existing[0],
-        });
+        if (existing.length > 0) {
+          return reply.status(409).send({
+            success: false,
+            error: `A customer with mobile number ${data.mobileNumber} already exists (${existing[0].name}).`,
+            existingCustomer: existing[0],
+          });
+        }
       }
 
       // Generate customer code
@@ -175,7 +177,7 @@ export async function customerRoutes(fastify: FastifyInstance) {
           name: data.name.trim(),
           relationType: data.relationType,
           relationName: data.relationName ? data.relationName.trim() : null,
-          mobileNumber: data.mobileNumber.trim(),
+          mobileNumber: data.mobileNumber ? data.mobileNumber.trim() : null,
           secondaryMobile: data.secondaryMobile ? data.secondaryMobile.trim() : null,
           email: data.email ? data.email.trim() : null,
           monthlyIncome: data.monthlyIncome,

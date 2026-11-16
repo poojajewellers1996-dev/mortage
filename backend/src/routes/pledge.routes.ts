@@ -34,7 +34,7 @@ const createPledgeSchema = z.object({
       name: z.string().min(2),
       relationType: z.enum(['S/O', 'D/O', 'W/O', 'C/O', 'O']).default('S/O'),
       relationName: z.string().optional().nullable(),
-      mobileNumber: z.string().regex(/^[0-9+ -]{10,15}$/),
+      mobileNumber: z.string().optional().nullable().or(z.literal('')),
       secondaryMobile: z.string().optional().nullable(),
       email: z.string().email().optional().nullable().or(z.literal('')),
       monthlyIncome: z.union([z.number(), z.string()]).default(0),
@@ -277,12 +277,16 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Check if customer exists by mobile
-        const existingCust = await db
-          .select()
-          .from(customers)
-          .where(eq(customers.mobileNumber, data.customer.mobileNumber.trim()))
-          .limit(1);
+        // Check if customer exists by mobile if mobile provided
+        let existingCust: any[] = [];
+        const cleanMobile = data.customer.mobileNumber ? data.customer.mobileNumber.trim() : null;
+        if (cleanMobile) {
+          existingCust = await db
+            .select()
+            .from(customers)
+            .where(eq(customers.mobileNumber, cleanMobile))
+            .limit(1);
+        }
 
         if (existingCust.length > 0) {
           finalCustomerId = existingCust[0].id;
@@ -291,7 +295,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
             await db
               .update(customers)
               .set({ photoUrl: data.customer.photoUrl })
-              .where(eq(customers.id, finalCustomerId));
+              .where(eq(customers.id, finalCustomerId as string));
           }
         } else {
           // Create new customer
@@ -306,7 +310,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
               name: data.customer.name.trim(),
               relationType: data.customer.relationType,
               relationName: data.customer.relationName ? data.customer.relationName.trim() : null,
-              mobileNumber: data.customer.mobileNumber.trim(),
+              mobileNumber: cleanMobile,
               secondaryMobile: data.customer.secondaryMobile || null,
               email: data.customer.email || null,
               monthlyIncome: String(data.customer.monthlyIncome || 0),
@@ -392,7 +396,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
           .insert(pledges)
           .values({
             pledgeNumber: pledgeNum,
-            customerId: finalCustomerId,
+            customerId: finalCustomerId as string,
             pledgeDate: data.pledgeDate,
             dueDate: data.dueDate,
             interestRatePercent: String(data.interestRatePercent),
