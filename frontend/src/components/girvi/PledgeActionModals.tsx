@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Pledge } from "@/types";
+import { Pledge, PledgeArticle } from "@/types";
 import { api } from "@/lib/api";
 import { formatIndianCurrency, formatWeight } from "@/lib/number-to-words";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,10 @@ import {
   ShieldCheck,
   Edit,
   Trash2,
+  Plus,
+  Scale,
+  Gem,
+  Hash,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -247,6 +251,18 @@ export function ReleaseModal({
 /*                                EDIT MODAL                                  */
 /* -------------------------------------------------------------------------- */
 
+interface EditableArticleItem {
+  id?: string;
+  itemName: string;
+  purity: string;
+  quantity: number;
+  grossWeight: number | string;
+  lessWeight: number | string;
+  netWeight: number | string;
+  loanAmount: number | string;
+  presentValue?: number | string;
+}
+
 interface EditModalProps {
   isOpen: boolean;
   pledge: Pledge | null;
@@ -260,6 +276,8 @@ export function EditModal({
   onClose,
   onSuccess,
 }: EditModalProps) {
+  // Main Pledge Info
+  const [pledgeNumber, setPledgeNumber] = useState("");
   const [pledgeDate, setPledgeDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [closedDate, setClosedDate] = useState("");
@@ -267,10 +285,15 @@ export function EditModal({
   const [metalType, setMetalType] = useState<"Gold" | "Silver">("Gold");
   const [storageLocation, setStorageLocation] = useState("");
   const [remarks, setRemarks] = useState("");
+
+  // Articles Info
+  const [articles, setArticles] = useState<EditableArticleItem[]>([]);
+  const [isLoadingArticles, setIsLoadingArticles] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (pledge) {
+    if (pledge && isOpen) {
+      setPledgeNumber(pledge.pledgeNumber || "");
       setPledgeDate(
         pledge.pledgeDate ? new Date(pledge.pledgeDate).toISOString().split("T")[0] : ""
       );
@@ -284,13 +307,138 @@ export function EditModal({
       setMetalType((pledge.metalType as any) || "Gold");
       setStorageLocation(pledge.storageLocation || "");
       setRemarks(pledge.closureRemarks || "");
+
+      // Load full article items from API or existing pledge
+      if (pledge.articles && pledge.articles.length > 0) {
+        setArticles(
+          pledge.articles.map((art) => ({
+            id: art.id,
+            itemName: art.itemName || "Jewellery Article",
+            purity: art.purity || "22K",
+            quantity: Number(art.quantity) || 1,
+            grossWeight: art.grossWeight || "0.000",
+            lessWeight: art.lessWeight || "0.000",
+            netWeight: art.netWeight || "0.000",
+            loanAmount: art.loanAmount || "0",
+            presentValue: art.presentValue || "0",
+          }))
+        );
+      } else {
+        setIsLoadingArticles(true);
+        api
+          .getPledge(pledge.id)
+          .then((res) => {
+            if (res.success && res.data?.articles && res.data.articles.length > 0) {
+              setArticles(
+                res.data.articles.map((art: any) => ({
+                  id: art.id,
+                  itemName: art.itemName || "Jewellery Article",
+                  purity: art.purity || "22K",
+                  quantity: Number(art.quantity) || 1,
+                  grossWeight: art.grossWeight || "0.000",
+                  lessWeight: art.lessWeight || "0.000",
+                  netWeight: art.netWeight || "0.000",
+                  loanAmount: art.loanAmount || "0",
+                  presentValue: art.presentValue || "0",
+                }))
+              );
+            } else {
+              // Fallback single article initialized with pledge totals
+              setArticles([
+                {
+                  itemName: pledge.metalType === "Silver" ? "Silver Article" : "Gold Article",
+                  purity: pledge.metalType === "Silver" ? "92.5%" : "22K",
+                  quantity: pledge.totalArticlesCount || 1,
+                  grossWeight: pledge.totalGrossWeight || "0.000",
+                  lessWeight: pledge.totalLessWeight || "0.000",
+                  netWeight: pledge.totalNetWeight || "0.000",
+                  loanAmount: pledge.totalLoanAmount || "0",
+                },
+              ]);
+            }
+          })
+          .catch(() => {
+            setArticles([
+              {
+                itemName: pledge.metalType === "Silver" ? "Silver Article" : "Gold Article",
+                purity: pledge.metalType === "Silver" ? "92.5%" : "22K",
+                quantity: pledge.totalArticlesCount || 1,
+                grossWeight: pledge.totalGrossWeight || "0.000",
+                lessWeight: pledge.totalLessWeight || "0.000",
+                netWeight: pledge.totalNetWeight || "0.000",
+                loanAmount: pledge.totalLoanAmount || "0",
+              },
+            ]);
+          })
+          .finally(() => setIsLoadingArticles(false));
+      }
     }
-  }, [pledge]);
+  }, [pledge, isOpen]);
 
   if (!isOpen || !pledge) return null;
 
+  // Article row updates
+  const updateArticle = (index: number, field: keyof EditableArticleItem, value: any) => {
+    setArticles((prev) => {
+      const next = [...prev];
+      const target = { ...next[index], [field]: value };
+
+      if (field === "grossWeight" || field === "lessWeight") {
+        const gross = parseFloat(String(field === "grossWeight" ? value : target.grossWeight)) || 0;
+        const less = parseFloat(String(field === "lessWeight" ? value : target.lessWeight)) || 0;
+        target.netWeight = Math.max(0, gross - less).toFixed(3);
+      }
+
+      next[index] = target;
+
+      // Update total loan amount if single item
+      if (field === "loanAmount" && next.length === 1) {
+        setTotalLoanAmount(value);
+      }
+
+      return next;
+    });
+  };
+
+  const addArticle = () => {
+    setArticles((prev) => [
+      ...prev,
+      {
+        itemName: metalType === "Silver" ? "Silver Item" : "Gold Item",
+        purity: metalType === "Silver" ? "92.5%" : "22K",
+        quantity: 1,
+        grossWeight: "0.000",
+        lessWeight: "0.000",
+        netWeight: "0.000",
+        loanAmount: "0",
+      },
+    ]);
+  };
+
+  const removeArticle = (index: number) => {
+    if (articles.length <= 1) {
+      toast.error("At least one article is required for a pledge.");
+      return;
+    }
+    setArticles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Recalculate computed totals
+  const totalGrossCalculated = articles
+    .reduce((sum, a) => sum + (parseFloat(String(a.grossWeight)) || 0), 0)
+    .toFixed(3);
+  const totalNetCalculated = articles
+    .reduce((sum, a) => sum + (parseFloat(String(a.netWeight)) || 0), 0)
+    .toFixed(3);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!pledgeNumber.trim()) {
+      toast.error("Pledge number cannot be empty.");
+      return;
+    }
+
     const loanNum = Number(totalLoanAmount);
     if (isNaN(loanNum) || loanNum <= 0) {
       toast.error("Please enter a valid loan amount.");
@@ -300,12 +448,29 @@ export function EditModal({
     setIsSubmitting(true);
     try {
       const updateData: any = {
+        pledgeNumber: pledgeNumber.trim(),
         pledgeDate: pledgeDate || undefined,
         dueDate: dueDate || undefined,
         totalLoanAmount: loanNum,
         metalType,
         storageLocation: storageLocation.trim() || undefined,
         closureRemarks: remarks.trim() || undefined,
+        articles: articles.map((art) => {
+          const gross = parseFloat(String(art.grossWeight)) || 0;
+          const less = parseFloat(String(art.lessWeight || 0)) || 0;
+          const net = parseFloat(String(art.netWeight)) || Math.max(0, gross - less);
+          const amt = parseFloat(String(art.loanAmount || 0)) || 0;
+          return {
+            itemName: (art.itemName || "Jewellery Article").trim(),
+            purity: art.purity || "22K",
+            quantity: Number(art.quantity) || 1,
+            grossWeight: gross,
+            lessWeight: less,
+            netWeight: net,
+            loanAmount: amt,
+            presentValue: amt * 1.3,
+          };
+        }),
       };
 
       if (pledge.status === "closed" && closedDate) {
@@ -314,15 +479,19 @@ export function EditModal({
 
       const res = await api.updatePledge(pledge.id, updateData);
       if (res.success) {
-        toast.success(`Pledge ${pledge.pledgeNumber} updated successfully!`);
+        toast.success(`Pledge ${pledgeNumber} updated successfully!`);
         onSuccess({
           ...pledge,
           ...updateData,
-          totalLoanAmount: loanNum,
+          totalLoanAmount: String(loanNum),
+          totalGrossWeight: totalGrossCalculated,
+          totalNetWeight: totalNetCalculated,
+          totalArticlesCount: articles.reduce((sum, a) => sum + (Number(a.quantity) || 1), 0),
+          articles: res.data?.articles || articles,
         });
         onClose();
       } else {
-        toast.error(res.message || "Failed to update pledge.");
+        toast.error((res as any).message || (res as any).error || "Failed to update pledge.");
       }
     } catch (err: any) {
       toast.error(err.message || "Error updating pledge.");
@@ -332,8 +501,8 @@ export function EditModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-6">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#0B1326] text-white border-b border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -343,7 +512,8 @@ export function EditModal({
             <div>
               <h3 className="text-base font-bold">Edit Girvi Record (संशोधन)</h3>
               <p className="text-[11px] text-slate-400">
-                Pledge #{pledge.pledgeNumber} • {pledge.customer?.name}
+                Customer: <strong className="text-white">{pledge.customer?.name}</strong> • Mobile:{" "}
+                {pledge.customer?.mobileNumber || "—"}
               </p>
             </div>
           </div>
@@ -355,105 +525,290 @@ export function EditModal({
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
-                Pledge Date
-              </Label>
-              <Input
-                type="date"
-                required
-                value={pledgeDate}
-                onChange={(e) => setPledgeDate(e.target.value)}
-                className="h-9 text-xs"
-              />
+        {/* Form Body (Scrollable) */}
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+          {/* Section 1: Pledge Identification & Terms */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+              <Hash className="h-3.5 w-3.5 text-amber-600" />
+              <span>1. Pledge Number & Timeline (गिरवी नंबर एवं अवधि)</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Pledge Number (EDITABLE!) */}
+              <div>
+                <Label className="text-xs font-bold text-amber-900 mb-1.5 block">
+                  Pledge Number *
+                </Label>
+                <Input
+                  required
+                  value={pledgeNumber}
+                  onChange={(e) => setPledgeNumber(e.target.value)}
+                  placeholder="e.g. C4682"
+                  className="h-9 text-xs font-mono font-bold border-amber-300 bg-amber-50/30 text-slate-900 focus-visible:ring-amber-500"
+                />
+              </div>
+
+              {/* Pledge Date */}
+              <div>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                  Pledge Date *
+                </Label>
+                <Input
+                  type="date"
+                  required
+                  value={pledgeDate}
+                  onChange={(e) => setPledgeDate(e.target.value)}
+                  className="h-9 text-xs font-medium"
+                />
+              </div>
+
+              {/* Due Date */}
+              <div>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                  Due Date *
+                </Label>
+                <Input
+                  type="date"
+                  required
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="h-9 text-xs font-medium"
+                />
+              </div>
             </div>
 
-            <div>
-              <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
-                Due Date
-              </Label>
-              <Input
-                type="date"
-                required
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="h-9 text-xs"
-              />
-            </div>
+            {pledge.status === "closed" && (
+              <div>
+                <Label className="text-xs font-bold text-emerald-800 mb-1.5 block">
+                  Release Date (छुड़ाने की तिथि)
+                </Label>
+                <Input
+                  type="date"
+                  value={closedDate}
+                  onChange={(e) => setClosedDate(e.target.value)}
+                  className="h-9 text-xs border-emerald-300 font-semibold"
+                />
+              </div>
+            )}
           </div>
 
-          {pledge.status === "closed" && (
-            <div>
-              <Label className="text-xs font-bold text-emerald-800 mb-1.5 block">
-                Release Date (छुड़ाने की तिथि)
-              </Label>
-              <Input
-                type="date"
-                value={closedDate}
-                onChange={(e) => setClosedDate(e.target.value)}
-                className="h-9 text-xs border-emerald-300 font-semibold"
-              />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
-                Loan Amount (₹) *
-              </Label>
-              <Input
-                type="number"
-                step="any"
-                required
-                value={totalLoanAmount}
-                onChange={(e) => setTotalLoanAmount(e.target.value)}
-                className="h-9 text-xs font-bold text-slate-900"
-              />
-            </div>
-
-            <div>
-              <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
-                Metal Type
-              </Label>
-              <select
-                value={metalType}
-                onChange={(e) => setMetalType(e.target.value as any)}
-                className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-medium"
+          {/* Section 2: Jewellery Articles (Item Name, Weights, Amount) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Gem className="h-3.5 w-3.5 text-amber-600" />
+                <span>2. Jewellery Items & Weights (आभूषण विवरण एवं वजन)</span>
+              </h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addArticle}
+                className="h-7 px-2.5 text-xs gap-1 border-amber-300 text-amber-800 hover:bg-amber-50"
               >
-                <option value="Gold">Gold (सोना)</option>
-                <option value="Silver">Silver (चांदी)</option>
-              </select>
+                <Plus className="h-3.5 w-3.5" />
+                <span>+ Add Item</span>
+              </Button>
+            </div>
+
+            {isLoadingArticles ? (
+              <div className="p-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
+                <span>Loading jewellery items...</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {articles.map((art, index) => (
+                  <div
+                    key={index}
+                    className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 relative space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                        Item #{index + 1}
+                      </span>
+                      {articles.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeArticle(index)}
+                          className="text-rose-600 hover:text-rose-800 text-xs flex items-center gap-0.5"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span>Remove</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* Item Name */}
+                      <div className="sm:col-span-2">
+                        <Label className="text-[11px] font-semibold text-slate-600 mb-1 block">
+                          Item Name / Description *
+                        </Label>
+                        <Input
+                          required
+                          value={art.itemName}
+                          onChange={(e) => updateArticle(index, "itemName", e.target.value)}
+                          placeholder="e.g. 22K Gold Necklace"
+                          className="h-8 text-xs bg-white font-medium"
+                        />
+                      </div>
+
+                      {/* Purity */}
+                      <div>
+                        <Label className="text-[11px] font-semibold text-slate-600 mb-1 block">
+                          Purity
+                        </Label>
+                        <Input
+                          value={art.purity}
+                          onChange={(e) => updateArticle(index, "purity", e.target.value)}
+                          placeholder="e.g. 22K or 92.5%"
+                          className="h-8 text-xs bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {/* Quantity */}
+                      <div>
+                        <Label className="text-[11px] font-semibold text-slate-600 mb-1 block">
+                          Quantity
+                        </Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={art.quantity}
+                          onChange={(e) => updateArticle(index, "quantity", e.target.value)}
+                          className="h-8 text-xs bg-white text-center font-bold"
+                        />
+                      </div>
+
+                      {/* Gross Weight */}
+                      <div>
+                        <Label className="text-[11px] font-semibold text-slate-600 mb-1 block">
+                          Gross Wt (g) *
+                        </Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          required
+                          value={art.grossWeight}
+                          onChange={(e) => updateArticle(index, "grossWeight", e.target.value)}
+                          className="h-8 text-xs bg-white font-bold"
+                        />
+                      </div>
+
+                      {/* Less Weight (Deduction) */}
+                      <div>
+                        <Label className="text-[11px] font-semibold text-slate-600 mb-1 block">
+                          Less Wt (g)
+                        </Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          value={art.lessWeight}
+                          onChange={(e) => updateArticle(index, "lessWeight", e.target.value)}
+                          className="h-8 text-xs bg-white"
+                        />
+                      </div>
+
+                      {/* Net Weight (Gross - Less) */}
+                      <div>
+                        <Label className="text-[11px] font-semibold text-amber-900 mb-1 block">
+                          Net Wt (g)
+                        </Label>
+                        <div className="h-8 rounded-lg border border-amber-200 bg-amber-50/70 px-2 flex items-center text-xs font-black text-amber-900">
+                          {formatWeight(art.netWeight || 0)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Weight Totals Badge */}
+                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200/80 flex items-center justify-between text-xs font-bold text-amber-950">
+                  <div className="flex items-center gap-1.5">
+                    <Scale className="h-3.5 w-3.5 text-amber-700" />
+                    <span>Calculated Total Weight:</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span>Gross: {totalGrossCalculated} g</span>
+                    <span>•</span>
+                    <span className="text-amber-900 font-extrabold">Net: {totalNetCalculated} g</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Financial & Storage Details */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+              <Coins className="h-3.5 w-3.5 text-emerald-600" />
+              <span>3. Loan Amount & Storage (ऋण राशि एवं लॉकर)</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Total Loan Amount */}
+              <div>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                  Total Loan Amount (₹) *
+                </Label>
+                <Input
+                  type="number"
+                  step="any"
+                  required
+                  value={totalLoanAmount}
+                  onChange={(e) => setTotalLoanAmount(e.target.value)}
+                  className="h-9 text-xs font-bold text-emerald-800"
+                />
+              </div>
+
+              {/* Metal Type */}
+              <div>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                  Metal Type *
+                </Label>
+                <select
+                  value={metalType}
+                  onChange={(e) => setMetalType(e.target.value as any)}
+                  className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-medium"
+                >
+                  <option value="Gold">🪙 Gold (सोना)</option>
+                  <option value="Silver">🥈 Silver (चांदी)</option>
+                </select>
+              </div>
+
+              {/* Storage Location */}
+              <div>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                  Locker / Storage
+                </Label>
+                <Input
+                  value={storageLocation}
+                  onChange={(e) => setStorageLocation(e.target.value)}
+                  placeholder="e.g. Vault-1, Locker 04"
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Remarks */}
+            <div>
+              <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                Remarks / Notes
+              </Label>
+              <Input
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="e.g. Verified ornaments with hallmark"
+                className="h-9 text-xs"
+              />
             </div>
           </div>
 
-          <div>
-            <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
-              Locker / Storage Location
-            </Label>
-            <Input
-              value={storageLocation}
-              onChange={(e) => setStorageLocation(e.target.value)}
-              placeholder="e.g. Vault-1, Locker 04"
-              className="h-9 text-xs"
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
-              Remarks
-            </Label>
-            <Input
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              placeholder="e.g. Special customer terms"
-              className="h-9 text-xs"
-            />
-          </div>
-
-          {/* Actions */}
+          {/* Form Actions Footer */}
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
             <Button
               type="button"
@@ -469,15 +824,18 @@ export function EditModal({
               type="submit"
               disabled={isSubmitting}
               variant="gold"
-              className="gap-2 font-bold text-xs px-4"
+              className="gap-2 font-bold text-xs px-5 shadow-sm"
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Saving...</span>
+                  <span>Saving Updates...</span>
                 </>
               ) : (
-                <span>Save Changes</span>
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Save Pledge & Items</span>
+                </>
               )}
             </Button>
           </div>
@@ -517,7 +875,7 @@ export function DeleteModal({
         onSuccess(pledge.id);
         onClose();
       } else {
-        toast.error(res.message || "Failed to delete pledge.");
+        toast.error((res as any).message || (res as any).error || "Failed to delete pledge.");
       }
     } catch (err: any) {
       toast.error(err.message || "Error deleting pledge.");

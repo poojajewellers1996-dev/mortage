@@ -475,6 +475,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
       }
 
       const body = request.body as Partial<{
+        pledgeNumber: string;
         dueDate: string;
         pledgeDate: string;
         totalLoanAmount: number | string;
@@ -484,11 +485,42 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
         status: string;
         closedDate: string;
         metalType: string;
+        articles: Array<{
+          id?: string;
+          itemName: string;
+          metalType?: string;
+          purity?: string;
+          quantity?: number | string;
+          grossWeight: number | string;
+          lessWeight?: number | string;
+          netWeight?: number | string;
+          presentValue?: number | string;
+          loanAmount?: number | string;
+          remarks?: string;
+        }>;
       }>;
 
       const updateData: Record<string, unknown> = {
         updatedAt: new Date(),
       };
+
+      // Pledge number update with uniqueness check
+      if (body.pledgeNumber && body.pledgeNumber.trim() !== existing[0].pledgeNumber) {
+        const trimmedNumber = body.pledgeNumber.trim();
+        const duplicate = await db
+          .select({ id: pledges.id })
+          .from(pledges)
+          .where(and(eq(pledges.pledgeNumber, trimmedNumber), ne(pledges.id, id)))
+          .limit(1);
+
+        if (duplicate.length > 0) {
+          return reply.status(400).send({
+            success: false,
+            error: `Pledge number "${trimmedNumber}" is already in use by another pledge.`,
+          });
+        }
+        updateData.pledgeNumber = trimmedNumber;
+      }
 
       if (body.dueDate) updateData.dueDate = body.dueDate;
       if (body.pledgeDate) updateData.pledgeDate = body.pledgeDate;
@@ -500,28 +532,95 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
       if (body.closedDate !== undefined) updateData.closedDate = body.closedDate;
       if (body.metalType !== undefined) updateData.metalType = body.metalType;
 
-      const updated = await db
-        .update(pledges)
-        .set(updateData)
-        .where(eq(pledges.id, id))
-        .returning();
+      await db.transaction(async tx => {
+        // Update articles if provided
+        if (body.articles && Array.isArray(body.articles) && body.articles.length > 0) {
+          await tx.delete(pledgeArticles).where(eq(pledgeArticles.pledgeId, id));
+
+          const articlesToInsert = body.articles.map((art) => {
+            const gross = parseFloat(String(art.grossWeight)) || 0;
+            const less = parseFloat(String(art.lessWeight || 0)) || 0;
+            const net = parseFloat(String(art.netWeight)) || Math.max(0, gross - less);
+            const amt = parseFloat(String(art.loanAmount || 0)) || 0;
+            const presVal = parseFloat(String(art.presentValue || 0)) || amt * 1.3;
+
+            return {
+              pledgeId: id,
+              itemName: (art.itemName || 'Jewellery Article').trim(),
+              metalType: art.metalType || body.metalType || existing[0].metalType || 'Gold',
+              purity: art.purity || '22K',
+              quantity: parseInt(String(art.quantity || 1), 10) || 1,
+              grossWeight: gross.toFixed(3),
+              lessWeight: less.toFixed(3),
+              netWeight: net.toFixed(3),
+              presentValue: presVal.toFixed(2),
+              loanAmount: amt.toFixed(2),
+              remarks: art.remarks || null,
+            };
+          });
+
+          await tx.insert(pledgeArticles).values(articlesToInsert);
+
+          // Calculate totals from updated articles
+          const totalGross = body.articles.reduce(
+            (sum, a) => sum + (parseFloat(String(a.grossWeight)) || 0),
+            0
+          );
+          const totalLess = body.articles.reduce(
+            (sum, a) => sum + (parseFloat(String(a.lessWeight || 0)) || 0),
+            0
+          );
+          const totalNet = body.articles.reduce(
+            (sum, a) =>
+              sum +
+              (parseFloat(String(a.netWeight)) ||
+                Math.max(
+                  0,
+                  (parseFloat(String(a.grossWeight)) || 0) -
+                    (parseFloat(String(a.lessWeight || 0)) || 0)
+                )),
+            0
+          );
+          const totalCount = body.articles.reduce(
+            (sum, a) => sum + (parseInt(String(a.quantity || 1), 10) || 1),
+            0
+          );
+
+          updateData.totalGrossWeight = totalGross.toFixed(3);
+          updateData.totalLessWeight = totalLess.toFixed(3);
+          updateData.totalNetWeight = totalNet.toFixed(3);
+          updateData.totalArticlesCount = totalCount;
+        }
+
+        await tx.update(pledges).set(updateData).where(eq(pledges.id, id));
+      });
+
+      const updatedPledge = await db.select().from(pledges).where(eq(pledges.id, id)).limit(1);
+      const updatedArticles = await db.select().from(pledgeArticles).where(eq(pledgeArticles.pledgeId, id));
 
       await AuditService.log({
         userId: request.user?.id,
         action: 'UPDATE_PLEDGE',
         entityName: 'pledges',
         entityId: id,
-        details: updateData,
+        details: { updateData, articlesCount: updatedArticles.length },
         ipAddress: request.ip,
       });
 
       return reply.send({
         success: true,
-        data: updated[0],
+        data: {
+          ...updatedPledge[0],
+          articles: updatedArticles,
+        },
+        message: 'Pledge updated successfully',
       });
-    } catch (err) {
+    } catch (err: any) {
       request.log.error(err);
-      return reply.status(500).send({ success: false, error: 'Failed to update pledge' });
+      return reply.status(500).send({
+        success: false,
+        error: err.message || 'Failed to update pledge',
+      });
     }
   });
 
