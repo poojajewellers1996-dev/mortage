@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { PledgeArticle } from "@/types";
-import { numberToIndianWords, formatIndianCurrency } from "@/lib/number-to-words";
+import { numberToIndianWords } from "@/lib/number-to-words";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { CameraModal } from "./CameraModal";
-import { Trash2, Camera, Upload, CheckCircle2, AlertTriangle, X, Image as ImageIcon } from "lucide-react";
+import { Trash2, Camera, Upload, CheckCircle2, Image as ImageIcon } from "lucide-react";
 
 interface ArticleCardProps {
   index: number;
@@ -35,16 +35,18 @@ export function ArticleCard({
 
     // Auto-calculate Net Weight if Gross or Less Weight changes
     if (field === "grossWeight" || field === "lessWeight") {
-      const gross = parseFloat(String(field === "grossWeight" ? value : updated.grossWeight)) || 0;
-      const less = parseFloat(String(field === "lessWeight" ? value : updated.lessWeight)) || 0;
+      const grossStr = field === "grossWeight" ? value : updated.grossWeight;
+      const lessStr = field === "lessWeight" ? value : updated.lessWeight;
+      const gross = parseFloat(String(grossStr)) || 0;
+      const less = parseFloat(String(lessStr)) || 0;
       const net = Math.max(0, gross - less);
-      updated.netWeight = parseFloat(net.toFixed(3));
+      updated.netWeight = gross > 0 ? parseFloat(net.toFixed(3)) : "";
     }
 
     // Auto-calculate Loan Amount in Words if Loan Amount changes
     if (field === "loanAmount" && !allowManualWords) {
       const loan = parseFloat(String(value)) || 0;
-      updated.loanAmountWords = numberToIndianWords(loan);
+      updated.loanAmountWords = loan > 0 ? numberToIndianWords(loan) : "";
     }
 
     onChange(updated);
@@ -62,6 +64,12 @@ export function ArticleCard({
       reader.readAsDataURL(file);
     }
   };
+
+  const displayLoanWords =
+    article.loanAmountWords ||
+    (parseFloat(String(article.loanAmount || 0)) > 0
+      ? numberToIndianWords(article.loanAmount)
+      : "—");
 
   return (
     <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm transition-all hover:border-amber-400/50 hover:shadow-md relative space-y-4">
@@ -122,8 +130,8 @@ export function ArticleCard({
             Article Description <span className="text-rose-600">*</span>
           </Label>
           <Input
-            placeholder="e.g. 22K Gold Antique Necklace"
-            value={article.itemName}
+            placeholder="e.g. Gold Ring, Silver Leg Chain, Gold Necklace..."
+            value={article.itemName || ""}
             onChange={(e) => handleFieldChange("itemName", e.target.value)}
             required
           />
@@ -133,12 +141,12 @@ export function ArticleCard({
         <div className="space-y-1.5">
           <Label>Metal Type</Label>
           <select
-            value={article.metalType}
+            value={article.metalType || "Gold"}
             onChange={(e) => handleFieldChange("metalType", e.target.value)}
             className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
           >
-            <option value="Gold">Gold</option>
-            <option value="Silver">Silver</option>
+            <option value="Gold">Gold (सोना)</option>
+            <option value="Silver">Silver (चांदी)</option>
             <option value="Platinum">Platinum</option>
             <option value="Diamond">Diamond Studded</option>
           </select>
@@ -148,7 +156,7 @@ export function ArticleCard({
         <div className="space-y-1.5">
           <Label>Purity</Label>
           <select
-            value={article.purity}
+            value={article.purity || "22K (916)"}
             onChange={(e) => handleFieldChange("purity", e.target.value)}
             className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
           >
@@ -170,7 +178,8 @@ export function ArticleCard({
           <Input
             type="number"
             min="1"
-            value={article.quantity}
+            placeholder="1"
+            value={article.quantity !== undefined && article.quantity !== null ? article.quantity : 1}
             onChange={(e) => handleFieldChange("quantity", parseInt(e.target.value, 10) || 1)}
             required
           />
@@ -186,7 +195,7 @@ export function ArticleCard({
             step="0.001"
             min="0"
             placeholder="0.000"
-            value={article.grossWeight || ""}
+            value={article.grossWeight !== undefined && article.grossWeight !== null ? article.grossWeight : ""}
             onChange={(e) => handleFieldChange("grossWeight", e.target.value)}
             required
           />
@@ -200,7 +209,7 @@ export function ArticleCard({
             step="0.001"
             min="0"
             placeholder="0.000"
-            value={article.lessWeight || ""}
+            value={article.lessWeight !== undefined && article.lessWeight !== null ? article.lessWeight : ""}
             onChange={(e) => handleFieldChange("lessWeight", e.target.value)}
           />
         </div>
@@ -212,7 +221,9 @@ export function ArticleCard({
             <span className="text-[10px] text-slate-500 font-mono">Gross - Less</span>
           </div>
           <div className="flex h-10 w-full items-center rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm font-bold text-slate-900">
-            {parseFloat(String(article.netWeight || 0)).toFixed(3)} g
+            {article.netWeight && parseFloat(String(article.netWeight)) > 0
+              ? `${parseFloat(String(article.netWeight)).toFixed(3)} g`
+              : "0.000 g"}
           </div>
         </div>
 
@@ -225,8 +236,8 @@ export function ArticleCard({
             type="number"
             step="100"
             min="0"
-            placeholder="₹0.00"
-            value={article.presentValue || ""}
+            placeholder="e.g. 50000"
+            value={article.presentValue !== undefined && article.presentValue !== null ? article.presentValue : ""}
             onChange={(e) => handleFieldChange("presentValue", e.target.value)}
             required
           />
@@ -241,36 +252,11 @@ export function ArticleCard({
             type="number"
             step="100"
             min="0"
-            placeholder="₹0.00"
-            value={article.loanAmount || ""}
+            placeholder="e.g. 35000"
+            value={article.loanAmount !== undefined && article.loanAmount !== null ? article.loanAmount : ""}
             onChange={(e) => handleFieldChange("loanAmount", e.target.value)}
             required
           />
-        </div>
-
-        {/* Repledged Toggle */}
-        <div className="space-y-1.5 sm:col-span-2">
-          <div className="flex items-center gap-3 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
-              <input
-                type="checkbox"
-                checked={article.isRepledged || false}
-                onChange={(e) => handleFieldChange("isRepledged", e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-              />
-              <span>Is item repledged with another bank / financial institution?</span>
-            </label>
-          </div>
-
-          {article.isRepledged && (
-            <div className="pt-2">
-              <Input
-                placeholder="Enter repledged bank name & branch"
-                value={article.repledgedBankName || ""}
-                onChange={(e) => handleFieldChange("repledgedBankName", e.target.value)}
-              />
-            </div>
-          )}
         </div>
       </div>
 
@@ -281,7 +267,7 @@ export function ArticleCard({
             Loan Amount in Words
           </span>
           <p className="text-xs font-semibold text-slate-800">
-            {article.loanAmountWords || numberToIndianWords(article.loanAmount || 0)}
+            {displayLoanWords}
           </p>
         </div>
 
@@ -298,70 +284,71 @@ export function ArticleCard({
 
       {allowManualWords && (
         <div className="space-y-1">
-          <Label>Custom Words (Admin Override)</Label>
+          <Label className="text-xs">Custom Words Override</Label>
           <Input
+            placeholder="Enter custom loan amount words"
             value={article.loanAmountWords || ""}
             onChange={(e) => handleFieldChange("loanAmountWords", e.target.value)}
           />
         </div>
       )}
 
-      {/* Item Photograph Upload / Camera */}
-      <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex items-center gap-2">
+      {/* Photo Capture Section */}
+      <div className="flex flex-wrap items-center gap-3 pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowCamera(true)}
+          className="gap-1.5 text-xs text-slate-700"
+        >
+          <Camera className="h-3.5 w-3.5 text-amber-600" />
+          Take Photo
+        </Button>
+
+        <label className="cursor-pointer">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => setShowCamera(true)}
-            className="gap-2 text-xs h-9"
+            className="gap-1.5 text-xs text-slate-700 pointer-events-none"
           >
-            <Camera className="h-4 w-4 text-amber-600" />
-            Take Photo
-          </Button>
-
-          <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer h-9 shadow-sm">
-            <Upload className="h-4 w-4 text-slate-500" />
+            <Upload className="h-3.5 w-3.5 text-slate-500" />
             Upload File
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </label>
-        </div>
+          </Button>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+        </label>
 
         {article.itemPhotoUrl && (
-          <div className="flex items-center gap-2 p-1.5 rounded-lg border border-slate-200 bg-slate-50">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={article.itemPhotoUrl}
-              alt="Item preview"
-              className="h-9 w-9 rounded object-cover border border-slate-300"
-            />
-            <span className="text-xs text-emerald-700 font-medium flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Photo attached
-            </span>
+          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Photo Attached</span>
             <button
               type="button"
               onClick={() => handleFieldChange("itemPhotoUrl", null)}
-              className="p-1 rounded text-slate-400 hover:text-rose-600"
+              className="text-emerald-700 hover:text-rose-600 ml-1"
+              title="Remove photo"
             >
-              <X className="h-3.5 w-3.5" />
+              &times;
             </button>
           </div>
         )}
       </div>
 
-      {/* Camera Modal */}
-      <CameraModal
-        isOpen={showCamera}
-        onClose={() => setShowCamera(false)}
-        title={`Photograph for Article #${index + 1}`}
-        onCapture={(dataUrl) => handleFieldChange("itemPhotoUrl", dataUrl)}
-      />
+      {/* Camera Capture Modal */}
+      {showCamera && (
+        <CameraModal
+          isOpen={showCamera}
+          onClose={() => setShowCamera(false)}
+          onCapture={(photoDataUrl) => handleFieldChange("itemPhotoUrl", photoDataUrl)}
+          title={`Capture Photo for Article #${index + 1}`}
+        />
+      )}
     </div>
   );
 }

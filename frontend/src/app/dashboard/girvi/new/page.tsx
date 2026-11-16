@@ -72,16 +72,16 @@ export default function NewGirviPage() {
   // Articles state
   const [articles, setArticles] = useState<PledgeArticle[]>([
     {
-      itemName: "Gold Necklace 22K",
+      itemName: "",
       metalType: "Gold",
       purity: "22K (916)",
       quantity: 1,
-      grossWeight: 15.5,
-      lessWeight: 0.5,
-      netWeight: 15.0,
-      presentValue: 95000,
-      loanAmount: 65000,
-      loanAmountWords: numberToIndianWords(65000),
+      grossWeight: "",
+      lessWeight: "",
+      netWeight: "",
+      presentValue: "",
+      loanAmount: "",
+      loanAmountWords: "",
       isRepledged: false,
     },
   ]);
@@ -135,12 +135,12 @@ export default function NewGirviPage() {
         metalType: "Gold",
         purity: "22K (916)",
         quantity: 1,
-        grossWeight: 0,
-        lessWeight: 0,
-        netWeight: 0,
-        presentValue: 0,
-        loanAmount: 0,
-        loanAmountWords: "Rupees Zero Only",
+        grossWeight: "",
+        lessWeight: "",
+        netWeight: "",
+        presentValue: "",
+        loanAmount: "",
+        loanAmountWords: "",
         isRepledged: false,
       },
     ]);
@@ -186,6 +186,10 @@ export default function NewGirviPage() {
   // Form Submission
   const handleSubmit = async (isDraft = false) => {
     // Basic Validations
+    if (!pledgeNumber.trim()) {
+      toast.error("Please enter a Pledge Number.");
+      return;
+    }
     if (!customer.name.trim()) {
       toast.error("Customer name is required.");
       return;
@@ -278,18 +282,19 @@ export default function NewGirviPage() {
 
   const handleReset = () => {
     if (confirm("Are you sure you want to reset the form? All unsaved data will be cleared.")) {
+      setPledgeNumber("");
       setArticles([
         {
           itemName: "",
           metalType: "Gold",
           purity: "22K (916)",
           quantity: 1,
-          grossWeight: 0,
-          lessWeight: 0,
-          netWeight: 0,
-          presentValue: 0,
-          loanAmount: 0,
-          loanAmountWords: "Rupees Zero Only",
+          grossWeight: "",
+          lessWeight: "",
+          netWeight: "",
+          presentValue: "",
+          loanAmount: "",
+          loanAmountWords: "",
           isRepledged: false,
         },
       ]);
@@ -333,7 +338,7 @@ export default function NewGirviPage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 text-white font-mono text-xs font-bold shadow-sm">
             <KeyRound className="h-3.5 w-3.5 text-amber-400" />
-            <span>{pledgeNumber || "Generating..."}</span>
+            <span>{pledgeNumber ? `PLEDGE #${pledgeNumber}` : "NEW GIRVI"}</span>
           </div>
         </div>
       </div>
@@ -347,28 +352,27 @@ export default function NewGirviPage() {
             <h3 className="text-sm font-bold text-slate-900">Pledge Timeline & Loan Terms</h3>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Pledge Number Field */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Pledge Number Field - Direct User Input */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label>Pledge Number *</Label>
-                {isAdmin ? (
-                  <span className="text-[10px] text-amber-600 font-semibold">Admin Edit</span>
-                ) : (
-                  <Lock className="h-3 w-3 text-slate-400" />
-                )}
-              </div>
+              <Label htmlFor="pledgeNumber">
+                Pledge Number <span className="text-rose-600">*</span>
+              </Label>
               <Input
+                id="pledgeNumber"
+                placeholder="Enter Pledge # (e.g. C4682)"
                 value={pledgeNumber}
-                onChange={(e) => isAdmin && setPledgeNumber(e.target.value)}
-                readOnly={!isAdmin}
-                className={!isAdmin ? "bg-slate-50 font-mono font-bold text-slate-700" : "font-mono font-bold"}
+                onChange={(e) => setPledgeNumber(e.target.value.toUpperCase())}
+                required
+                className="font-mono font-bold text-slate-900"
               />
             </div>
 
             {/* Pledge Date */}
             <div className="space-y-1.5">
-              <Label>Pledge Date *</Label>
+              <Label>
+                Pledge Date <span className="text-rose-600">*</span>
+              </Label>
               <Input
                 type="date"
                 value={pledgeDate}
@@ -379,34 +383,14 @@ export default function NewGirviPage() {
 
             {/* Due Date */}
             <div className="space-y-1.5">
-              <Label>Due Date *</Label>
+              <Label>
+                Due Date <span className="text-rose-600">*</span>
+              </Label>
               <Input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 required
-              />
-            </div>
-
-            {/* Interest Rate */}
-            <div className="space-y-1.5">
-              <Label>Interest Rate (%/mo)</Label>
-              <Input
-                type="number"
-                step="0.05"
-                min="0"
-                value={interestRate}
-                onChange={(e) => setInterestRate(parseFloat(e.target.value) || 1.5)}
-              />
-            </div>
-
-            {/* Storage Vault Location */}
-            <div className="space-y-1.5">
-              <Label>Locker / Vault Location</Label>
-              <Input
-                value={storageLocation}
-                onChange={(e) => setStorageLocation(e.target.value)}
-                placeholder="Vault-1, Locker 14"
               />
             </div>
           </div>
