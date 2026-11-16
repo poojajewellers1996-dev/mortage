@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Customer, RelationType } from "@/types";
 import { api } from "@/lib/api";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
 import { CameraModal } from "./CameraModal";
-import { Search, UserPlus, Camera, Upload, User, CheckCircle2, X } from "lucide-react";
+import { Camera, Upload, User, CheckCircle2, X, Sparkles, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface CustomerSelectorProps {
   customer: {
@@ -29,34 +30,49 @@ interface CustomerSelectorProps {
 }
 
 export function CustomerSelector({ customer, onChange, onSelectExisting }: CustomerSelectorProps) {
-  const [isExistingMode, setIsExistingMode] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Customer[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [isSearchingMobile, setIsSearchingMobile] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (!searchQuery.trim() || !isExistingMode) {
-      setSearchResults([]);
-      return;
+  const handleMobileChange = (val: string) => {
+    onChange("mobileNumber", val);
+
+    // Cancel any previous debounce timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
 
-    const timer = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await api.getCustomers({ search: searchQuery, limit: 5 });
-        if (res.success) {
-          setSearchResults(res.data);
-        }
-      } catch (err) {
-        console.error("Failed to search customers:", err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
+    const digits = val.replace(/\D/g, "");
 
-    return () => clearTimeout(timer);
-  }, [searchQuery, isExistingMode]);
+    // Trigger auto-lookup once 10 digits are available
+    if (digits.length >= 10) {
+      const searchDigits = digits.slice(-10); // Extract last 10 digits
+      searchTimeoutRef.current = setTimeout(async () => {
+        setIsSearchingMobile(true);
+        try {
+          const res = await api.getCustomers({ search: searchDigits, limit: 1 });
+          if (res.success && res.data && res.data.length > 0) {
+            const match = res.data[0];
+            onSelectExisting(match);
+            toast.success(`Existing Customer Found: ${match.name}! KYC details auto-filled.`);
+          } else {
+            // Unlink if no customer match
+            if (customer.id) {
+              onChange("id", null);
+            }
+          }
+        } catch (err) {
+          console.error("Customer auto-lookup error:", err);
+        } finally {
+          setIsSearchingMobile(false);
+        }
+      }, 350);
+    } else {
+      if (customer.id) {
+        onChange("id", null);
+      }
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -73,120 +89,90 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
 
   return (
     <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
-      {/* Header and Toggle */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs shadow-sm">
             <User className="h-4 w-4 text-amber-400" />
           </div>
           <div>
             <h3 className="text-sm font-bold text-slate-900">Customer (Pledgor) Details</h3>
-            <p className="text-[11px] text-slate-500">Provide verified KYC details and photograph</p>
+            <p className="text-[11px] text-slate-500">
+              Enter mobile number to automatically fetch existing customer profile & photo
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 p-1 rounded-lg bg-slate-100 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => setIsExistingMode(false)}
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-              !isExistingMode
-                ? "bg-white text-slate-950 shadow-sm"
-                : "text-slate-600 hover:text-slate-950"
-            }`}
-          >
-            New Customer
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsExistingMode(true)}
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-              isExistingMode
-                ? "bg-white text-slate-950 shadow-sm"
-                : "text-slate-600 hover:text-slate-950"
-            }`}
-          >
-            Search Existing
-          </button>
-        </div>
+        {customer.id ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+            Existing Customer Verified
+          </span>
+        ) : (
+          <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+            New Customer Entry
+          </span>
+        )}
       </div>
 
-      {/* Existing Customer Search Input */}
-      {isExistingMode && (
-        <div className="space-y-2 relative pb-2">
-          <Label>Search by Customer Name or Mobile</Label>
+      {/* Form Fields Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Mobile Number - First Field for Auto-Lookup */}
+        <div className="space-y-1.5 sm:col-span-1">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="mobileNumber">
+              Mobile Number <span className="text-rose-600">*</span>
+            </Label>
+            {isSearchingMobile && (
+              <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+                <Loader2 className="h-2.5 w-2.5 animate-spin text-amber-600" />
+                Searching records...
+              </span>
+            )}
+          </div>
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Type name or 10-digit mobile number..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10"
+              id="mobileNumber"
+              type="tel"
+              placeholder="e.g. 9820123456"
+              value={customer.mobileNumber}
+              onChange={(e) => handleMobileChange(e.target.value)}
+              required
+              className={customer.id ? "border-emerald-500 bg-emerald-50/20 pr-9 font-bold" : "font-semibold"}
             />
-            {isSearching && (
-              <div className="absolute right-3 top-3 h-4 w-4 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
+            {customer.id && (
+              <CheckCircle2 className="absolute right-3 top-2.5 h-4 w-4 text-emerald-600" />
             )}
           </div>
 
-          {searchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 z-30 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl divide-y divide-slate-100">
-              {searchResults.map((cust) => (
-                <div
-                  key={cust.id}
-                  onClick={() => {
-                    onSelectExisting(cust);
-                    setSearchResults([]);
-                    setSearchQuery(cust.name);
-                  }}
-                  className="flex items-center justify-between p-3 hover:bg-amber-50/60 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-700">
-                      {cust.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{cust.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {cust.mobileNumber} • {cust.relationType} {cust.relationName}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold text-amber-700 bg-amber-100/60 px-2 py-1 rounded">
-                    Select
-                  </span>
-                </div>
-              ))}
+          {customer.id && (
+            <div className="flex items-center justify-between text-[11px] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+              <span className="font-semibold truncate">
+                ✓ Auto-filled: {customer.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => onChange("id", null)}
+                className="text-emerald-900 hover:text-rose-700 underline text-[10px] ml-2 shrink-0 cursor-pointer"
+              >
+                Unlink
+              </button>
             </div>
           )}
         </div>
-      )}
 
-      {/* Customer Form Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Customer Name */}
+        {/* Customer Full Name */}
         <div className="space-y-1.5 sm:col-span-2">
-          <Label>
+          <Label htmlFor="customerName">
             Customer Full Name <span className="text-rose-600">*</span>
           </Label>
           <Input
+            id="customerName"
             placeholder="e.g. Ramesh Chandra Patel"
             value={customer.name}
             onChange={(e) => onChange("name", e.target.value)}
             required
-          />
-        </div>
-
-        {/* Mobile Number */}
-        <div className="space-y-1.5">
-          <Label>
-            Mobile Number <span className="text-rose-600">*</span>
-          </Label>
-          <Input
-            type="tel"
-            placeholder="e.g. 9820123456"
-            value={customer.mobileNumber}
-            onChange={(e) => onChange("mobileNumber", e.target.value)}
-            required
+            className="font-medium"
           />
         </div>
 
@@ -216,17 +202,6 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
           />
         </div>
 
-        {/* Monthly Income */}
-        <div className="space-y-1.5">
-          <Label>Monthly Income (₹)</Label>
-          <Input
-            type="number"
-            placeholder="e.g. 45000"
-            value={customer.monthlyIncome || ""}
-            onChange={(e) => onChange("monthlyIncome", e.target.value)}
-          />
-        </div>
-
         {/* Secondary Mobile */}
         <div className="space-y-1.5">
           <Label>Secondary Mobile (Optional)</Label>
@@ -238,14 +213,15 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
           />
         </div>
 
-        {/* Address */}
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label>
+        {/* Full Residential Address */}
+        <div className="space-y-1.5 sm:col-span-3">
+          <Label htmlFor="customerAddress">
             Full Residential Address <span className="text-rose-600">*</span>
           </Label>
           <textarea
+            id="customerAddress"
             rows={2}
-            placeholder="House / Flat No., Society / Chawl, Street / Road, Landmark"
+            placeholder="House / Flat No., Society / Chawl, Street / Road, Village / Area, Landmark"
             value={customer.address}
             onChange={(e) => onChange("address", e.target.value)}
             required
@@ -262,7 +238,7 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
               variant="outline"
               size="sm"
               onClick={() => setShowCamera(true)}
-              className="gap-2 text-xs h-9"
+              className="gap-2 text-xs h-9 text-slate-700"
             >
               <Camera className="h-4 w-4 text-amber-600" />
               Take Customer Photo
@@ -280,21 +256,22 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
             </label>
 
             {customer.photoUrl && (
-              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-slate-200 bg-slate-50">
+              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-emerald-200 bg-emerald-50/50">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={customer.photoUrl}
                   alt="Customer preview"
-                  className="h-9 w-9 rounded-full object-cover border border-slate-300"
+                  className="h-10 w-10 rounded-full object-cover border border-emerald-400 shadow-sm"
                 />
-                <span className="text-xs text-emerald-700 font-medium flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Photo verified
+                <span className="text-xs text-emerald-800 font-semibold flex items-center gap-1">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Photo Attached
                 </span>
                 <button
                   type="button"
                   onClick={() => onChange("photoUrl", null)}
-                  className="p-1 rounded text-slate-400 hover:text-rose-600"
+                  className="p-1 rounded text-slate-400 hover:text-rose-600 cursor-pointer"
+                  title="Remove photo"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -305,12 +282,14 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
       </div>
 
       {/* Camera Modal */}
-      <CameraModal
-        isOpen={showCamera}
-        onClose={() => setShowCamera(false)}
-        title="Customer Live Webcam Photograph"
-        onCapture={(dataUrl) => onChange("photoUrl", dataUrl)}
-      />
+      {showCamera && (
+        <CameraModal
+          isOpen={showCamera}
+          onClose={() => setShowCamera(false)}
+          title="Customer Live Webcam Photograph"
+          onCapture={(dataUrl) => onChange("photoUrl", dataUrl)}
+        />
+      )}
     </div>
   );
 }
