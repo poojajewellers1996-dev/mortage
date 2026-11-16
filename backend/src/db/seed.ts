@@ -19,7 +19,7 @@ async function seed() {
         ownerName: 'Deepak',
         phone: '+91 98765 43210',
         secondaryPhone: '',
-        email: 'poojajewellers1886@gmail.com',
+        email: 'poojajewellers1996@gmail.com',
         addressLine1: 'Pooja Jewellers, Main Market',
         city: 'Mumbai',
         state: 'Maharashtra',
@@ -41,7 +41,7 @@ async function seed() {
       .insert(users)
       .values({
         name: 'Deepak (Pooja Jewellers)',
-        email: 'poojajewellers1886@gmail.com',
+        email: 'poojajewellers1996@gmail.com',
         passwordHash: adminPasswordHash,
         role: 'admin',
         isActive: true,
