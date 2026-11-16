@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import {
+  EditModal,
+  DeleteModal,
+} from "@/components/girvi/PledgeActionModals";
+import {
   Search,
   Eye,
   Printer,
@@ -21,6 +25,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Edit,
+  Trash2,
 } from "lucide-react";
 
 type SortField =
@@ -43,6 +49,10 @@ function ReleasedGirviPageInner() {
   const [sortField, setSortField] = useState<SortField>("closedDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
+  // Action Modals State
+  const [editModalPledge, setEditModalPledge] = useState<Pledge | null>(null);
+  const [deleteModalPledge, setDeleteModalPledge] = useState<Pledge | null>(null);
+
   useEffect(() => {
     fetchReleasedPledges();
   }, [search, metalFilter]);
@@ -55,7 +65,7 @@ function ReleasedGirviPageInner() {
         status: "closed",
         metalType: metalFilter !== "all" ? metalFilter : undefined,
         page: 1,
-        limit: 5000, // Load all released records in one view (no 38-page pagination)
+        limit: 5000, // Load all released records in one view
       });
 
       if (res.success) {
@@ -262,7 +272,7 @@ function ReleasedGirviPageInner() {
         </div>
       </Card>
 
-      {/* All-In-One Released Pledges Table with Interactive Sorting */}
+      {/* All-In-One Released Pledges Table with Interactive Sorting & Actions */}
       <Card className="rounded-xl border-slate-200/90 shadow-sm overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto max-h-[72vh] overflow-y-auto">
@@ -277,7 +287,7 @@ function ReleasedGirviPageInner() {
                   <th className="px-4 py-3 text-right">{renderSortHeader("Items / Net Wt", "weight", "right")}</th>
                   <th className="px-4 py-3 text-right">{renderSortHeader("Settled Loan", "amount", "right")}</th>
                   <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3 text-right min-w-[200px]">Actions (कार्रवाई)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -344,19 +354,54 @@ function ReleasedGirviPageInner() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1">
+                          {/* EDIT BUTTON */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditModalPledge(p)}
+                            className="h-7 px-2 text-xs text-amber-800 hover:bg-amber-100/60 hover:text-amber-950 transition-colors gap-1"
+                            title="Edit Details (संशोधन)"
+                          >
+                            <Edit className="h-3.5 w-3.5 text-amber-700" />
+                            <span className="hidden sm:inline">Edit</span>
+                          </Button>
+
+                          {/* VIEW BUTTON */}
                           <Link href={`/dashboard/girvi/${p.id}`}>
-                            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-slate-700 hover:bg-slate-100 gap-1"
+                              title="View Details (देखें)"
+                            >
                               <Eye className="h-3.5 w-3.5" />
-                              View
+                              <span className="hidden sm:inline">View</span>
                             </Button>
                           </Link>
+
+                          {/* RECEIPT BUTTON */}
                           <Link href={`/dashboard/girvi/${p.id}/receipt`}>
-                            <Button variant="outline" size="sm" className="h-8 px-2 text-xs gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-1.5 text-xs text-amber-700 hover:bg-amber-50"
+                              title="Print Receipt"
+                            >
                               <Printer className="h-3.5 w-3.5 text-amber-600" />
-                              Receipt
                             </Button>
                           </Link>
+
+                          {/* DELETE BUTTON */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteModalPledge(p)}
+                            className="h-7 px-1.5 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                            title="Delete Record (हटाएं)"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -385,6 +430,27 @@ function ReleasedGirviPageInner() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ACTION MODALS */}
+      <EditModal
+        isOpen={!!editModalPledge}
+        pledge={editModalPledge}
+        onClose={() => setEditModalPledge(null)}
+        onSuccess={(updatedPledge) => {
+          setPledges((prev) =>
+            prev.map((p) => (p.id === updatedPledge.id ? { ...p, ...updatedPledge } : p))
+          );
+        }}
+      />
+
+      <DeleteModal
+        isOpen={!!deleteModalPledge}
+        pledge={deleteModalPledge}
+        onClose={() => setDeleteModalPledge(null)}
+        onSuccess={(deletedId) => {
+          setPledges((prev) => prev.filter((p) => p.id !== deletedId));
+        }}
+      />
     </div>
   );
 }

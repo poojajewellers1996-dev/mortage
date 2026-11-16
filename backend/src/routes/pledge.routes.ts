@@ -476,10 +476,14 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
 
       const body = request.body as Partial<{
         dueDate: string;
-        interestRatePercent: number;
+        pledgeDate: string;
+        totalLoanAmount: number | string;
+        interestRatePercent: number | string;
         storageLocation: string;
         closureRemarks: string;
         status: string;
+        closedDate: string;
+        metalType: string;
       }>;
 
       const updateData: Record<string, unknown> = {
@@ -487,10 +491,14 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
       };
 
       if (body.dueDate) updateData.dueDate = body.dueDate;
+      if (body.pledgeDate) updateData.pledgeDate = body.pledgeDate;
+      if (body.totalLoanAmount !== undefined) updateData.totalLoanAmount = String(body.totalLoanAmount);
       if (body.interestRatePercent !== undefined) updateData.interestRatePercent = String(body.interestRatePercent);
       if (body.storageLocation !== undefined) updateData.storageLocation = body.storageLocation;
       if (body.closureRemarks !== undefined) updateData.closureRemarks = body.closureRemarks;
       if (body.status !== undefined) updateData.status = body.status;
+      if (body.closedDate !== undefined) updateData.closedDate = body.closedDate;
+      if (body.metalType !== undefined) updateData.metalType = body.metalType;
 
       const updated = await db
         .update(pledges)
@@ -524,6 +532,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
       totalPaid: number;
       paymentMode?: string;
       remarks?: string;
+      closedDate?: string;
     };
 
     try {
@@ -537,6 +546,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
       }
 
       const todayStr = new Date().toISOString().split('T')[0];
+      const releaseDateStr = body.closedDate || todayStr;
       const receiptNumber = `RCP-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
 
       await db.transaction(async tx => {
@@ -545,7 +555,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
           await tx.insert(payments).values({
             pledgeId: id,
             receiptNumber,
-            paymentDate: todayStr,
+            paymentDate: releaseDateStr,
             paymentType: 'closure',
             principalAmount: existing[0].totalLoanAmount,
             totalPaid: String(body.totalPaid),
@@ -560,7 +570,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
           .update(pledges)
           .set({
             status: 'closed',
-            closedDate: todayStr,
+            closedDate: releaseDateStr,
             closureRemarks: body.remarks || 'Loan redeemed and pledge closed',
             updatedAt: new Date(),
           })
@@ -572,7 +582,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
         action: 'CLOSE_PLEDGE',
         entityName: 'pledges',
         entityId: id,
-        details: { totalPaid: body.totalPaid, receiptNumber },
+        details: { totalPaid: body.totalPaid, receiptNumber, closedDate: releaseDateStr },
         ipAddress: request.ip,
       });
 
@@ -612,18 +622,18 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
 
       const settings = await db.select().from(businessSettings).limit(1);
       const business = settings[0] || {
-        businessName: 'Shree Ganesh Jewellers & Bankers',
+        businessName: 'Pooja Jewellers',
         tagline: 'Govt. Approved Pawn Brokers & Gold Loan Specialist',
-        licenseNumber: 'MH-PB-2024-8849',
-        gstin: '27AABCU9603R1ZM',
-        ownerName: 'Ramesh Chandra Sharma',
-        phone: '+91 98765 43210',
-        secondaryPhone: '022-28491029',
-        email: 'contact@ganeshjewellers.com',
-        addressLine1: 'Shop No. 12, Gold Souk Market, Zaveri Bazaar',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        pincode: '400002',
+        licenseNumber: 'RJ-PB-1996-5821',
+        gstin: '08AABCP1996R1ZM',
+        ownerName: 'Deepak Kumar',
+        phone: '+91 98201 23456',
+        secondaryPhone: '0291-2648192',
+        email: 'poojajewellers1996@gmail.com',
+        addressLine1: 'Main Market, Sojat City',
+        city: 'Pali',
+        state: 'Rajasthan',
+        pincode: '306104',
         termsAndConditions: '1. All jewellery articles pledged are stored safely in computerized fireproof vaults.\n2. Original receipt is mandatory for redemption.',
       };
 
@@ -642,12 +652,16 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // DELETE /api/pledges/:id (Admin only)
-  fastify.delete('/:id', { preHandler: [requireRole(['admin'])] }, async (request, reply) => {
+  // DELETE /api/pledges/:id
+  fastify.delete('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
 
     try {
-      await db.delete(pledges).where(eq(pledges.id, id));
+      await db.transaction(async tx => {
+        await tx.delete(payments).where(eq(payments.pledgeId, id));
+        await tx.delete(pledgeArticles).where(eq(pledgeArticles.pledgeId, id));
+        await tx.delete(pledges).where(eq(pledges.id, id));
+      });
 
       await AuditService.log({
         userId: request.user?.id,

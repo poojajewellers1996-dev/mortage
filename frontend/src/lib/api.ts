@@ -114,11 +114,11 @@ export const api = {
       body: JSON.stringify(pledgeData),
     }),
   updatePledge: (id: string, updateData: any) =>
-    apiFetch<{ success: boolean; data: any }>(`/api/pledges/${id}`, {
+    apiFetch<{ success: boolean; data: any; message?: string }>(`/api/pledges/${id}`, {
       method: "PUT",
       body: JSON.stringify(updateData),
     }),
-  closePledge: (id: string, closureData: { totalPaid: number; paymentMode?: string; remarks?: string }) =>
+  closePledge: (id: string, closureData: { totalPaid: number; paymentMode?: string; remarks?: string; closedDate?: string }) =>
     apiFetch<{ success: boolean; message: string }>(`/api/pledges/${id}/close`, {
       method: "POST",
       body: JSON.stringify(closureData),
