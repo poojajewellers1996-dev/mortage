@@ -446,15 +446,6 @@ export function EditModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!customerMobile.trim()) {
-      toast.error("Customer mobile number is compulsory (मोबाइल नंबर अनिवार्य है).");
-      return;
-    }
-    const cleanCustMobile = customerMobile.replace(/\D/g, "");
-    if (cleanCustMobile.length < 10) {
-      toast.error("Customer mobile number must be at least 10 digits.");
-      return;
-    }
     if (!customerName.trim()) {
       toast.error("Customer name cannot be empty.");
       return;
@@ -577,16 +568,16 @@ export function EditModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Customer Mobile Number */}
               <div>
-                <Label className="text-xs font-bold text-amber-900 mb-1.5 flex items-center gap-1">
-                  <Phone className="h-3 w-3 text-amber-600" />
-                  <span>Mobile Number (मोबाइल नंबर) * (Compulsory)</span>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
+                  <Phone className="h-3 w-3 text-slate-500" />
+                  <span>Mobile Number (मोबाइल नंबर)</span>
+                  <span className="text-slate-400 font-normal">(Optional)</span>
                 </Label>
                 <Input
-                  required
                   value={customerMobile}
                   onChange={(e) => setCustomerMobile(e.target.value)}
-                  placeholder="e.g. 9820123456"
-                  className="h-9 text-xs font-bold border-amber-300 bg-amber-50/20 text-slate-900 focus-visible:ring-amber-500"
+                  placeholder="e.g. 9820123456 (optional)"
+                  className="h-9 text-xs font-semibold text-slate-900"
                 />
               </div>
 

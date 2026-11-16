@@ -180,15 +180,6 @@ export default function NewGirviPage() {
       toast.error("Customer name is required.");
       return;
     }
-    if (!customer.mobileNumber || !customer.mobileNumber.trim()) {
-      toast.error("Customer mobile number is compulsory (मोबाइल नंबर अनिवार्य है).");
-      return;
-    }
-    const cleanDigits = customer.mobileNumber.replace(/\D/g, "");
-    if (cleanDigits.length < 10) {
-      toast.error("Customer mobile number must be at least 10 digits.");
-      return;
-    }
     if (!customer.address.trim()) {
       toast.error("Customer residential address is required.");
       return;

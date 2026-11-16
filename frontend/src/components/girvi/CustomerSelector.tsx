@@ -117,12 +117,12 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
 
       {/* Form Fields Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Mobile Number - First Field for Auto-Lookup (COMPULSORY) */}
+        {/* Mobile Number - First Field for Auto-Lookup (OPTIONAL) */}
         <div className="space-y-1.5 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <Label htmlFor="mobileNumber" className="font-bold text-slate-800 flex items-center gap-1">
+            <Label htmlFor="mobileNumber" className="font-semibold text-slate-700 flex items-center gap-1">
               <span>Mobile Number (मोबाइल नंबर)</span>
-              <span className="text-rose-600 font-extrabold">* (Compulsory)</span>
+              <span className="text-slate-400 text-xs font-normal">(Optional)</span>
             </Label>
             {isSearchingMobile && (
               <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
@@ -136,10 +136,9 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
               id="mobileNumber"
               type="tel"
               maxLength={15}
-              placeholder="e.g. 9820123456 (10 digits compulsory)"
+              placeholder="e.g. 9820123456 (optional)"
               value={customer.mobileNumber}
               onChange={(e) => handleMobileChange(e.target.value)}
-              required
               className={customer.id ? "border-emerald-500 bg-emerald-50/20 pr-9 font-bold" : "font-semibold"}
             />
             {customer.id && (
