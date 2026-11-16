@@ -119,6 +119,38 @@ export interface BusinessSettings {
   termsAndConditions?: string;
 }
 
+export interface LinkedPledgeItem {
+  repledgeId?: string;
+  pledgeId: string;
+  pledgeNumber: string;
+  totalGrossWeight?: string;
+  totalNetWeight?: string;
+  totalLoanAmount?: string;
+  status?: string;
+  customerName?: string;
+  customerMobile?: string;
+}
+
+export interface Repledge {
+  id: string;
+  pledgerName: string;
+  bankName: string;
+  bankPledgeNumber: string;
+  bankPledgeDate: string;
+  bankPledgeAmount: string | number;
+  status: "active" | "released";
+  releasedDate?: string | null;
+  releaseRemarks?: string | null;
+  remarks?: string | null;
+  totalPledgesCount: number;
+  totalGrossWeight: string;
+  totalNetWeight: string;
+  linkedPledgeNumbers: string[];
+  linkedPledges?: LinkedPledgeItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DashboardSummary {
   totalCustomers: number;
   totalActiveGirvi: number;

@@ -18,6 +18,8 @@ import {
   Sparkles,
   ChevronRight,
   CheckCircle2,
+  Landmark,
+  Undo2,
 } from "lucide-react";
 
 interface MobileNavProps {
@@ -44,6 +46,19 @@ function isItemActive(pathname: string, href: string): boolean {
       (pathname.startsWith("/dashboard/girvi/") &&
         pathname !== "/dashboard/girvi/new" &&
         !pathname.startsWith("/dashboard/girvi/released"))
+    );
+  }
+  if (href === "/dashboard/repledge/released") {
+    return (
+      pathname === "/dashboard/repledge/released" ||
+      pathname.startsWith("/dashboard/repledge/released/")
+    );
+  }
+  if (href === "/dashboard/repledge") {
+    return (
+      pathname === "/dashboard/repledge" ||
+      (pathname.startsWith("/dashboard/repledge/") &&
+        !pathname.startsWith("/dashboard/repledge/released"))
     );
   }
   return pathname.startsWith(href);
@@ -87,15 +102,22 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
           icon: CheckCircle2,
           badge: "Released",
         },
+      ],
+    },
+    {
+      group: "BANK RE-PLEDGE (री-प्लेज)",
+      items: [
         {
-          name: "Customers",
-          href: "/dashboard/customers",
-          icon: Users,
+          name: "Re-Pledge Girvi",
+          href: "/dashboard/repledge",
+          icon: Landmark,
+          badge: "Bank Girvi",
         },
         {
-          name: "Payments & Ledger",
-          href: "/dashboard/payments",
-          icon: CreditCard,
+          name: "Re-Pledge Release",
+          href: "/dashboard/repledge/released",
+          icon: Undo2,
+          badge: "Released",
         },
       ],
     },

@@ -102,7 +102,7 @@ export const api = {
   // Pledges
   getNextPledgeNumber: () =>
     apiFetch<{ success: boolean; nextNumber: string }>("/api/pledges/next-number"),
-  getPledges: (params?: { search?: string; status?: string; metalType?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) =>
+  getPledges: (params?: { search?: string; status?: string; metalType?: string; startDate?: string; endDate?: string; page?: number; limit?: number | string }) =>
     apiFetch<{ success: boolean; data: any[]; pagination: any }>("/api/pledges", { params }),
   getPledge: (id: string) =>
     apiFetch<{ success: boolean; data: any }>(`/api/pledges/${id}`),
@@ -173,5 +173,25 @@ export const api = {
     apiFetch<{ success: boolean; data: any; message: string }>("/api/settings", {
       method: "PUT",
       body: JSON.stringify(settingsData),
+    }),
+
+  // Re-Pledge (Bank Girvi)
+  getRepledges: (params?: { status?: string; search?: string; bankName?: string; pledgerName?: string }) =>
+    apiFetch<{ success: boolean; data: any[]; count: number }>("/api/repledges", { params }),
+  getRepledge: (id: string) =>
+    apiFetch<{ success: boolean; data: any }>(`/api/repledges/${id}`),
+  createRepledge: (data: any) =>
+    apiFetch<{ success: boolean; data: any; message: string }>("/api/repledges", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  releaseRepledge: (id: string, data: { releasedDate?: string; releaseRemarks?: string }) =>
+    apiFetch<{ success: boolean; data: any; message: string }>(`/api/repledges/${id}/release`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteRepledge: (id: string) =>
+    apiFetch<{ success: boolean; message: string }>(`/api/repledges/${id}`, {
+      method: "DELETE",
     }),
 };

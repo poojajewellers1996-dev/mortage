@@ -73,6 +73,9 @@ export const pledges = pgTable('pledges', {
   closedDate: date('closed_date'),
   closureRemarks: text('closure_remarks'),
   storageLocation: varchar('storage_location', { length: 100 }).default('Vault-1'),
+  isRepledged: boolean('is_repledged').notNull().default(false),
+  repledgeId: uuid('repledge_id'),
+  repledgedBankName: varchar('repledged_bank_name', { length: 255 }),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -155,7 +158,38 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 }));
 
 // ============================================================================
-// 6. STORAGE_DOCUMENTS TABLE
+// 6. REPLEDGES TABLE (BANK RE-PLEDGE GIRVI)
+// ============================================================================
+export const repledges = pgTable('repledges', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  pledgerName: varchar('pledger_name', { length: 255 }).notNull(),
+  bankName: varchar('bank_name', { length: 255 }).notNull(),
+  bankPledgeNumber: varchar('bank_pledge_number', { length: 100 }).notNull(),
+  bankPledgeDate: date('bank_pledge_date').notNull().defaultNow(),
+  bankPledgeAmount: numeric('bank_pledge_amount', { precision: 14, scale: 2 }).notNull().default('0.00'),
+  status: varchar('status', { length: 30 }).notNull().default('active'), // 'active' | 'released'
+  releasedDate: date('released_date'),
+  releaseRemarks: text('release_remarks'),
+  remarks: text('remarks'),
+  totalPledgesCount: integer('total_pledges_count').notNull().default(0),
+  totalGrossWeight: numeric('total_gross_weight', { precision: 10, scale: 3 }).default('0.000'),
+  totalNetWeight: numeric('total_net_weight', { precision: 10, scale: 3 }).default('0.000'),
+  linkedPledgeNumbers: jsonb('linked_pledge_numbers').$type<string[]>().default([]),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const repledgePledges = pgTable('repledge_pledges', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  repledgeId: uuid('repledge_id').notNull().references(() => repledges.id, { onDelete: 'cascade' }),
+  pledgeId: uuid('pledge_id').notNull().references(() => pledges.id, { onDelete: 'cascade' }),
+  pledgeNumber: varchar('pledge_number', { length: 50 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ============================================================================
+// 7. STORAGE_DOCUMENTS TABLE
 // ============================================================================
 export const storageDocuments = pgTable('storage_documents', {
   id: uuid('id').defaultRandom().primaryKey(),

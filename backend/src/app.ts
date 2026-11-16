@@ -14,6 +14,7 @@ import { paymentRoutes } from './routes/payment.routes.js';
 import { dashboardRoutes } from './routes/dashboard.routes.js';
 import { uploadRoutes } from './routes/upload.routes.js';
 import { settingsRoutes } from './routes/settings.routes.js';
+import { repledgeRoutes } from './routes/repledge.routes.js';
 import { client } from './db/index.js';
 
 dotenv.config();
@@ -130,6 +131,7 @@ export function buildApp(): FastifyInstance {
   app.register(dashboardRoutes, { prefix: '/api/dashboard' });
   app.register(uploadRoutes, { prefix: '/api/upload' });
   app.register(settingsRoutes, { prefix: '/api/settings' });
+  app.register(repledgeRoutes, { prefix: '/api/repledges' });
 
   // Centralized Error Handler
   app.setErrorHandler((error: any, request, reply) => {

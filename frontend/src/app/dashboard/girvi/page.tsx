@@ -355,7 +355,12 @@ function ActiveGirviPageInner() {
                   sortedPledges.map((p) => (
                     <tr key={p.id} className="hover:bg-amber-50/20 transition-colors">
                       <td className="px-4 py-3 font-mono font-bold text-slate-900">
-                        {p.pledgeNumber}
+                        <div>{p.pledgeNumber}</div>
+                        {(p as any).isRepledged && (
+                          <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                            🏦 {(p as any).repledgedBankName || "Bank Repledge"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-semibold text-slate-900">{p.customer?.name}</div>
