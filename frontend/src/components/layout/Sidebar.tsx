@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Landmark,
   Undo2,
+  Boxes,
 } from "lucide-react";
 
 function isItemActive(pathname: string, href: string): boolean {
@@ -34,6 +35,9 @@ function isItemActive(pathname: string, href: string): boolean {
       pathname === "/dashboard/girvi/released" ||
       pathname.startsWith("/dashboard/girvi/released/")
     );
+  }
+  if (href === "/dashboard/stock") {
+    return pathname === "/dashboard/stock" || pathname.startsWith("/dashboard/stock/");
   }
   if (href === "/dashboard/girvi") {
     return (
@@ -94,6 +98,12 @@ export function Sidebar() {
           href: "/dashboard/girvi/released",
           icon: CheckCircle2,
           badge: "Released",
+        },
+        {
+          name: "Locker Stock Audit",
+          href: "/dashboard/stock",
+          icon: Boxes,
+          badge: "तिजोरी",
         },
       ],
     },

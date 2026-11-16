@@ -127,6 +127,34 @@ export const api = {
     apiFetch<{ success: boolean; message: string }>(`/api/pledges/${id}`, {
       method: "DELETE",
     }),
+  getLockerStock: (params?: { metalType?: string; search?: string }) =>
+    apiFetch<{
+      success: boolean;
+      data: any[];
+      summary: {
+        gold: {
+          pledgesCount: number;
+          articlesCount: number;
+          totalGrossWeight: string;
+          totalNetWeight: string;
+          totalLoanAmount: number;
+        };
+        silver: {
+          pledgesCount: number;
+          articlesCount: number;
+          totalGrossWeight: string;
+          totalNetWeight: string;
+          totalLoanAmount: number;
+        };
+        overall: {
+          pledgesCount: number;
+          articlesCount: number;
+          totalGrossWeight: string;
+          totalNetWeight: string;
+          totalLoanAmount: number;
+        };
+      };
+    }>("/api/pledges/stock", { params }),
 
   // Articles
   addArticle: (pledgeId: string, articleData: any) =>

@@ -204,6 +204,140 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // GET /api/pledges/stock - Physical Locker Stock (Excludes bank re-pledged & released)
+  fastify.get('/stock', async (request, reply) => {
+    try {
+      const query = request.query as {
+        metalType?: string; // 'Gold' | 'Silver' | 'all'
+        search?: string;
+      };
+
+      const conditions = [
+        ne(pledges.status, 'closed'),
+        sql`${pledges.closedDate} IS NULL`,
+        or(eq(pledges.isRepledged, false), sql`${pledges.isRepledged} IS NULL`),
+      ];
+
+      if (query.metalType && query.metalType !== 'all') {
+        conditions.push(eq(pledges.metalType, query.metalType));
+      }
+
+      if (query.search && query.search.trim()) {
+        const searchTerm = `%${query.search.trim()}%`;
+        conditions.push(
+          or(
+            ilike(pledges.pledgeNumber, searchTerm),
+            ilike(customers.name, searchTerm),
+            ilike(customers.mobileNumber, searchTerm)
+          )
+        );
+      }
+
+      const records = await db
+        .select({
+          pledge: pledges,
+          customer: {
+            id: customers.id,
+            name: customers.name,
+            mobileNumber: customers.mobileNumber,
+          },
+        })
+        .from(pledges)
+        .leftJoin(customers, eq(pledges.customerId, customers.id))
+        .where(and(...conditions))
+        .orderBy(desc(pledges.createdAt));
+
+      // Fetch articles for these pledges
+      const pledgeIds = records.map(r => r.pledge.id);
+      let articlesMap: Record<string, any[]> = {};
+      if (pledgeIds.length > 0) {
+        const arts = await db
+          .select()
+          .from(pledgeArticles)
+          .where(inArray(pledgeArticles.pledgeId, pledgeIds));
+
+        for (const a of arts) {
+          if (!articlesMap[a.pledgeId]) {
+            articlesMap[a.pledgeId] = [];
+          }
+          articlesMap[a.pledgeId].push(a);
+        }
+      }
+
+      // Compute statistics for Gold vs Silver vs All
+      let goldStats = {
+        pledgesCount: 0,
+        articlesCount: 0,
+        totalGrossWeight: 0,
+        totalNetWeight: 0,
+        totalLoanAmount: 0,
+      };
+
+      let silverStats = {
+        pledgesCount: 0,
+        articlesCount: 0,
+        totalGrossWeight: 0,
+        totalNetWeight: 0,
+        totalLoanAmount: 0,
+      };
+
+      const enriched = records.map(r => {
+        const p = r.pledge;
+        const gross = parseFloat(String(p.totalGrossWeight || 0));
+        const net = parseFloat(String(p.totalNetWeight || 0));
+        const amt = parseFloat(String(p.totalLoanAmount || 0));
+        const count = p.totalArticlesCount || 1;
+
+        if (p.metalType === 'Silver') {
+          silverStats.pledgesCount += 1;
+          silverStats.articlesCount += count;
+          silverStats.totalGrossWeight += gross;
+          silverStats.totalNetWeight += net;
+          silverStats.totalLoanAmount += amt;
+        } else {
+          goldStats.pledgesCount += 1;
+          goldStats.articlesCount += count;
+          goldStats.totalGrossWeight += gross;
+          goldStats.totalNetWeight += net;
+          goldStats.totalLoanAmount += amt;
+        }
+
+        return {
+          ...p,
+          customer: r.customer,
+          articles: articlesMap[p.id] || [],
+        };
+      });
+
+      return reply.send({
+        success: true,
+        data: enriched,
+        summary: {
+          gold: {
+            ...goldStats,
+            totalGrossWeight: goldStats.totalGrossWeight.toFixed(3),
+            totalNetWeight: goldStats.totalNetWeight.toFixed(3),
+          },
+          silver: {
+            ...silverStats,
+            totalGrossWeight: silverStats.totalGrossWeight.toFixed(3),
+            totalNetWeight: silverStats.totalNetWeight.toFixed(3),
+          },
+          overall: {
+            pledgesCount: goldStats.pledgesCount + silverStats.pledgesCount,
+            articlesCount: goldStats.articlesCount + silverStats.articlesCount,
+            totalGrossWeight: (goldStats.totalGrossWeight + silverStats.totalGrossWeight).toFixed(3),
+            totalNetWeight: (goldStats.totalNetWeight + silverStats.totalNetWeight).toFixed(3),
+            totalLoanAmount: goldStats.totalLoanAmount + silverStats.totalLoanAmount,
+          },
+        },
+      });
+    } catch (err) {
+      request.log.error(err);
+      return reply.status(500).send({ success: false, error: 'Failed to retrieve locker stock' });
+    }
+  });
+
   // GET /api/pledges/:id
   fastify.get('/:id', async (request, reply) => {
     try {
