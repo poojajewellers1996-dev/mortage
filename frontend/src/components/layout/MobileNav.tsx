@@ -54,7 +54,7 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
                 <Gem className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-sm font-bold text-white">Shree Ganesh</div>
+                <div className="text-sm font-bold text-white">Pooja Jewellers</div>
                 <div className="text-[10px] text-amber-400 uppercase tracking-wider font-semibold">
                   Girvi Management
                 </div>

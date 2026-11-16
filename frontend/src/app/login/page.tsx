@@ -41,17 +41,6 @@ export default function LoginPage() {
     }
   };
 
-  const fillCredentials = (role: "admin" | "staff") => {
-    if (role === "admin") {
-      setEmail("admin@ganeshjewellers.com");
-      setPassword("Admin@123456");
-    } else {
-      setEmail("staff@ganeshjewellers.com");
-      setPassword("Staff@123456");
-    }
-    setErrorMessage("");
-  };
-
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-900 via-[#0F1E36] to-slate-950 p-4 sm:p-6">
       <div className="w-full max-w-md space-y-6">
@@ -61,7 +50,7 @@ export default function LoginPage() {
             <Gem className="h-9 w-9 stroke-[2.2]" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            Shree Ganesh Jewellers
+            Pooja Jewellers
           </h1>
           <p className="text-xs sm:text-sm text-amber-400 font-medium tracking-wider uppercase">
             Govt. Licensed Pawnbrokers & Gold Loan System
@@ -93,7 +82,7 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="name@ganeshjewellers.com"
+                    placeholder="poojajewellers1886@gmail.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -135,44 +124,12 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
-
-            {/* Quick Demo Credentials */}
-            <div className="pt-4 border-t border-slate-100">
-              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center mb-2">
-                Quick Sign-In Credentials
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => fillCredentials("admin")}
-                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-slate-200 hover:border-amber-400 hover:bg-amber-50/50 transition-colors text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-1 text-xs font-semibold text-slate-900">
-                    <Shield className="h-3 w-3 text-amber-600" />
-                    <span>Admin</span>
-                  </div>
-                  <span className="text-[10px] text-slate-500">Full Permissions</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => fillCredentials("staff")}
-                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-1 text-xs font-semibold text-slate-900">
-                    <Shield className="h-3 w-3 text-slate-600" />
-                    <span>Staff</span>
-                  </div>
-                  <span className="text-[10px] text-slate-500">Counter Operator</span>
-                </button>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
         {/* Footer info */}
         <p className="text-center text-xs text-slate-400">
-          Secured with Argon2id Password Hashing & 256-bit JWT Session Encryption
+          Secured with Bcrypt Password Hashing & 256-bit JWT Session Encryption
         </p>
       </div>
     </div>

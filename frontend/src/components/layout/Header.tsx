@@ -47,7 +47,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
             Girvi Management System
           </h1>
           <span className="text-xs text-slate-500 hidden sm:inline">
-            Shree Ganesh Jewellers & Bankers • Computerized Gold Loan Vault
+            Pooja Jewellers • Computerized Gold Loan Vault
           </span>
         </div>
       </div>

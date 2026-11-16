@@ -38,7 +38,7 @@ export function Sidebar() {
         </div>
         <div className="flex flex-col">
           <span className="text-base font-bold tracking-tight text-white leading-tight">
-            Shree Ganesh
+            Pooja Jewellers
           </span>
           <span className="text-xs font-medium text-amber-400 tracking-wider uppercase">
             Girvi Management

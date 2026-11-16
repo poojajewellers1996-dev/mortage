@@ -168,7 +168,7 @@ export default function GirviReceiptPage() {
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-slate-950 leading-tight">
-                  {business?.businessName || "Shree Ganesh Jewellers & Bankers"}
+                  {business?.businessName || "Pooja Jewellers"}
                 </h1>
                 <p className="text-xs font-semibold text-amber-700 tracking-wider uppercase">
                   {business?.tagline || "Govt. Approved Pawn Brokers & Gold Loan Specialist"}
@@ -360,7 +360,7 @@ export default function GirviReceiptPage() {
 
           <div className="text-center space-y-10">
             <div className="h-10 flex items-center justify-center">
-              <span className="text-[10px] text-slate-400 italic">For Shree Ganesh Jewellers & Bankers</span>
+              <span className="text-[10px] text-slate-400 italic">For Pooja Jewellers</span>
             </div>
             <div className="border-t border-slate-400 pt-1">
               <p className="font-bold text-slate-900">{business?.ownerName || "Authorized Signatory"}</p>

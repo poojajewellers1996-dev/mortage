@@ -4,7 +4,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "Girvi Management System | Shree Ganesh Jewellers & Bankers",
+  title: "Girvi Management System | Pooja Jewellers",
   description: "Enterprise Jewellery Pawn and Gold Loan Management System",
 };
 

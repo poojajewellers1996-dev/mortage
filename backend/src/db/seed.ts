@@ -12,15 +12,15 @@ async function seed() {
     const existingSettings = await db.select().from(businessSettings).limit(1);
     if (existingSettings.length === 0) {
       await db.insert(businessSettings).values({
-        businessName: 'Shree Ganesh Jewellers & Bankers',
+        businessName: 'Pooja Jewellers',
         tagline: 'Govt. Approved Pawn Brokers & Gold Loan Specialist',
         licenseNumber: 'MH-PB-2024-8849',
         gstin: '27AABCU9603R1ZM',
-        ownerName: 'Ramesh Chandra Sharma',
+        ownerName: 'Deepak',
         phone: '+91 98765 43210',
-        secondaryPhone: '022-28491029',
-        email: 'admin@ganeshjewellers.com',
-        addressLine1: 'Shop No. 12, Gold Souk Market, Zaveri Bazaar',
+        secondaryPhone: '',
+        email: 'poojajewellers1886@gmail.com',
+        addressLine1: 'Pooja Jewellers, Main Market',
         city: 'Mumbai',
         state: 'Maharashtra',
         pincode: '400002',
@@ -34,15 +34,14 @@ async function seed() {
       console.log('✅ Business settings seeded.');
     }
 
-    // 2. Users (Admin & Staff)
-    const adminPasswordHash = await hashPassword('Admin@123456');
-    const staffPasswordHash = await hashPassword('Staff@123456');
+    // 2. Users (Admin)
+    const adminPasswordHash = await hashPassword('Deepak@123');
 
     const adminUser = await db
       .insert(users)
       .values({
-        name: 'Ramesh Sharma (Admin)',
-        email: 'admin@ganeshjewellers.com',
+        name: 'Deepak (Pooja Jewellers)',
+        email: 'poojajewellers1886@gmail.com',
         passwordHash: adminPasswordHash,
         role: 'admin',
         isActive: true,
