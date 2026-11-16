@@ -77,8 +77,8 @@ export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModa
         .getPledges({ status: "active", limit: "all" })
         .then((res) => {
           if (res.success && res.data) {
-            // Filter pledges that are not already re-pledged to another bank
-            setAvailablePledges(res.data.filter((p: any) => !p.isRepledged));
+            // Load all active pledges (supports repledging a girvi across multiple bank ledgers)
+            setAvailablePledges(res.data);
           }
         })
         .catch((err) => {
@@ -363,6 +363,11 @@ export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModa
                           <span className="text-slate-400 text-[11px] ml-1.5">
                             ({p.totalArticlesCount || 1} item{p.totalArticlesCount !== 1 ? "s" : ""})
                           </span>
+                          {(p as any).isRepledged && (
+                            <span className="ml-2 inline-flex items-center gap-0.5 text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300 px-1.5 py-0.2 rounded">
+                              Also in: {(p as any).repledgedBankName || "Bank"}
+                            </span>
+                          )}
                         </div>
                       </div>
 

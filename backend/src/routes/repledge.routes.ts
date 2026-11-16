@@ -254,13 +254,29 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
             pledgeNumber: p.pledgeNumber,
           });
 
-          // Mark pledge as repledged
+          // Fetch all active banks this pledge is currently part of
+          const activeLinks = await tx
+            .select({ bankName: repledges.bankName })
+            .from(repledgePledges)
+            .innerJoin(repledges, eq(repledgePledges.repledgeId, repledges.id))
+            .where(
+              and(
+                eq(repledgePledges.pledgeId, p.id),
+                eq(repledges.status, 'active')
+              )
+            );
+
+          const allBankNames = Array.from(
+            new Set([...activeLinks.map(l => l.bankName), data.bankName.trim()])
+          ).join(', ');
+
+          // Mark pledge as repledged with all active banks
           await tx
             .update(pledges)
             .set({
               isRepledged: true,
               repledgeId: createdRepledge.id,
-              repledgedBankName: data.bankName.trim(),
+              repledgedBankName: allBankNames,
               updatedAt: new Date(),
             })
             .where(eq(pledges.id, p.id));
@@ -270,7 +286,7 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
             .update(pledgeArticles)
             .set({
               isRepledged: true,
-              repledgedBankName: data.bankName.trim(),
+              repledgedBankName: allBankNames,
               updatedAt: new Date(),
             })
             .where(eq(pledgeArticles.pledgeId, p.id));
@@ -348,26 +364,65 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
           })
           .where(eq(repledges.id, id));
 
-        // 2. Unlink all linked girvis so they are completely unlinked from bank repledge!
-        if (pledgeIds.length > 0) {
-          await tx
-            .update(pledges)
-            .set({
-              isRepledged: false,
-              repledgeId: null,
-              repledgedBankName: null,
-              updatedAt: new Date(),
-            })
-            .where(inArray(pledges.id, pledgeIds));
+        // 2. Smart unlinking: For each linked pledge, check if it has ANY OTHER ACTIVE bank re-pledges!
+        for (const pid of pledgeIds) {
+          const remainingActiveLinks = await tx
+            .select({ bankName: repledges.bankName, id: repledges.id })
+            .from(repledgePledges)
+            .innerJoin(repledges, eq(repledgePledges.repledgeId, repledges.id))
+            .where(
+              and(
+                eq(repledgePledges.pledgeId, pid),
+                sql`${repledges.id} != ${id}::uuid`,
+                eq(repledges.status, 'active')
+              )
+            );
 
-          await tx
-            .update(pledgeArticles)
-            .set({
-              isRepledged: false,
-              repledgedBankName: null,
-              updatedAt: new Date(),
-            })
-            .where(inArray(pledgeArticles.pledgeId, pledgeIds));
+          if (remainingActiveLinks.length > 0) {
+            // Still active in another bank re-pledge! Keep the remaining bank names
+            const remainingBanks = Array.from(
+              new Set(remainingActiveLinks.map(l => l.bankName))
+            ).join(', ');
+
+            await tx
+              .update(pledges)
+              .set({
+                isRepledged: true,
+                repledgeId: remainingActiveLinks[0].id,
+                repledgedBankName: remainingBanks,
+                updatedAt: new Date(),
+              })
+              .where(eq(pledges.id, pid));
+
+            await tx
+              .update(pledgeArticles)
+              .set({
+                isRepledged: true,
+                repledgedBankName: remainingBanks,
+                updatedAt: new Date(),
+              })
+              .where(eq(pledgeArticles.pledgeId, pid));
+          } else {
+            // No other active bank re-pledge! Fully unlinked and restored to shop vault!
+            await tx
+              .update(pledges)
+              .set({
+                isRepledged: false,
+                repledgeId: null,
+                repledgedBankName: null,
+                updatedAt: new Date(),
+              })
+              .where(eq(pledges.id, pid));
+
+            await tx
+              .update(pledgeArticles)
+              .set({
+                isRepledged: false,
+                repledgedBankName: null,
+                updatedAt: new Date(),
+              })
+              .where(eq(pledgeArticles.pledgeId, pid));
+          }
         }
       });
 
@@ -416,29 +471,66 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
       }
 
       await db.transaction(async tx => {
-        // If active, unlink girvis
+        // If active, unlink girvis with smart check for other active bank re-pledges
         if (existing[0].status === 'active') {
           const links = await tx.select().from(repledgePledges).where(eq(repledgePledges.repledgeId, id));
           const pIds = links.map(l => l.pledgeId);
-          if (pIds.length > 0) {
-            await tx
-              .update(pledges)
-              .set({
-                isRepledged: false,
-                repledgeId: null,
-                repledgedBankName: null,
-                updatedAt: new Date(),
-              })
-              .where(inArray(pledges.id, pIds));
+          for (const pid of pIds) {
+            const remainingActiveLinks = await tx
+              .select({ bankName: repledges.bankName, id: repledges.id })
+              .from(repledgePledges)
+              .innerJoin(repledges, eq(repledgePledges.repledgeId, repledges.id))
+              .where(
+                and(
+                  eq(repledgePledges.pledgeId, pid),
+                  sql`${repledges.id} != ${id}::uuid`,
+                  eq(repledges.status, 'active')
+                )
+              );
 
-            await tx
-              .update(pledgeArticles)
-              .set({
-                isRepledged: false,
-                repledgedBankName: null,
-                updatedAt: new Date(),
-              })
-              .where(inArray(pledgeArticles.pledgeId, pIds));
+            if (remainingActiveLinks.length > 0) {
+              const remainingBanks = Array.from(
+                new Set(remainingActiveLinks.map(l => l.bankName))
+              ).join(', ');
+
+              await tx
+                .update(pledges)
+                .set({
+                  isRepledged: true,
+                  repledgeId: remainingActiveLinks[0].id,
+                  repledgedBankName: remainingBanks,
+                  updatedAt: new Date(),
+                })
+                .where(eq(pledges.id, pid));
+
+              await tx
+                .update(pledgeArticles)
+                .set({
+                  isRepledged: true,
+                  repledgedBankName: remainingBanks,
+                  updatedAt: new Date(),
+                })
+                .where(eq(pledgeArticles.pledgeId, pid));
+            } else {
+              await tx
+                .update(pledges)
+                .set({
+                  isRepledged: false,
+                  repledgeId: null,
+                  repledgedBankName: null,
+                  updatedAt: new Date(),
+                })
+                .where(eq(pledges.id, pid));
+
+              await tx
+                .update(pledgeArticles)
+                .set({
+                  isRepledged: false,
+                  repledgedBankName: null,
+                  updatedAt: new Date(),
+                })
+                .where(eq(pledgeArticles.pledgeId, pid));
+            }
           }
         }
 

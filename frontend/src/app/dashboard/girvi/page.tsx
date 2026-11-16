@@ -357,9 +357,18 @@ function ActiveGirviPageInner() {
                       <td className="px-4 py-3 font-mono font-bold text-slate-900">
                         <div>{p.pledgeNumber}</div>
                         {(p as any).isRepledged && (
-                          <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                            🏦 {(p as any).repledgedBankName || "Bank Repledge"}
-                          </span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {String((p as any).repledgedBankName || "Bank Repledge")
+                              .split(",")
+                              .map((bName: string) => (
+                                <span
+                                  key={bName.trim()}
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300"
+                                >
+                                  🏦 {bName.trim()}
+                                </span>
+                              ))}
+                          </div>
                         )}
                       </td>
                       <td className="px-4 py-3">
