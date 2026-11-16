@@ -222,7 +222,7 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO users (id, name, email, password_hash, role, is_active)
 VALUES 
 (
-    'u0000000-0000-0000-0000-000000000001',
+    'b0000000-0000-0000-0000-000000000001',
     'Admin Manager',
     'admin@ganeshjewellers.com',
     '$2a$10$f3P6/eS9t1l10yYJdCZeOup.y8k.1mD4aP.cE7PzqL1R8bB6xT31W', -- Hashed Admin@123456
@@ -230,7 +230,7 @@ VALUES
     true
 ),
 (
-    'u0000000-0000-0000-0000-000000000002',
+    'b0000000-0000-0000-0000-000000000002',
     'Pawn Counter Staff',
     'staff@ganeshjewellers.com',
     '$2a$10$f3P6/eS9t1l10yYJdCZeOup.y8k.1mD4aP.cE7PzqL1R8bB6xT31W', -- Hashed Staff@123456
