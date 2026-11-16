@@ -23,6 +23,9 @@ import {
   Scale,
   Gem,
   Hash,
+  User,
+  Phone,
+  MapPin,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -276,7 +279,14 @@ export function EditModal({
   onClose,
   onSuccess,
 }: EditModalProps) {
-  // Main Pledge Info
+  // Customer Info (FULLY EDITABLE!)
+  const [customerName, setCustomerName] = useState("");
+  const [customerMobile, setCustomerMobile] = useState("");
+  const [customerRelationType, setCustomerRelationType] = useState("S/O");
+  const [customerRelationName, setCustomerRelationName] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+
+  // Pledge Info (FULLY EDITABLE!)
   const [pledgeNumber, setPledgeNumber] = useState("");
   const [pledgeDate, setPledgeDate] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -286,13 +296,21 @@ export function EditModal({
   const [storageLocation, setStorageLocation] = useState("");
   const [remarks, setRemarks] = useState("");
 
-  // Articles Info
+  // Articles Info (FULLY EDITABLE!)
   const [articles, setArticles] = useState<EditableArticleItem[]>([]);
   const [isLoadingArticles, setIsLoadingArticles] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (pledge && isOpen) {
+      // Customer Details
+      setCustomerName(pledge.customer?.name || "");
+      setCustomerMobile(pledge.customer?.mobileNumber || "");
+      setCustomerRelationType((pledge.customer?.relationType as string) || "S/O");
+      setCustomerRelationName(pledge.customer?.relationName || "");
+      setCustomerAddress(pledge.customer?.address || "");
+
+      // Pledge Details
       setPledgeNumber(pledge.pledgeNumber || "");
       setPledgeDate(
         pledge.pledgeDate ? new Date(pledge.pledgeDate).toISOString().split("T")[0] : ""
@@ -308,27 +326,23 @@ export function EditModal({
       setStorageLocation(pledge.storageLocation || "");
       setRemarks(pledge.closureRemarks || "");
 
-      // Load full article items from API or existing pledge
-      if (pledge.articles && pledge.articles.length > 0) {
-        setArticles(
-          pledge.articles.map((art) => ({
-            id: art.id,
-            itemName: art.itemName || "Jewellery Article",
-            purity: art.purity || "22K",
-            quantity: Number(art.quantity) || 1,
-            grossWeight: art.grossWeight || "0.000",
-            lessWeight: art.lessWeight || "0.000",
-            netWeight: art.netWeight || "0.000",
-            loanAmount: art.loanAmount || "0",
-            presentValue: art.presentValue || "0",
-          }))
-        );
-      } else {
-        setIsLoadingArticles(true);
-        api
-          .getPledge(pledge.id)
-          .then((res) => {
-            if (res.success && res.data?.articles && res.data.articles.length > 0) {
+      // Load full article items & full customer details if missing
+      setIsLoadingArticles(true);
+      api
+        .getPledge(pledge.id)
+        .then((res) => {
+          if (res.success && res.data) {
+            // Customer enrichment
+            if (res.data.customer) {
+              if (res.data.customer.name) setCustomerName(res.data.customer.name);
+              if (res.data.customer.mobileNumber) setCustomerMobile(res.data.customer.mobileNumber);
+              if (res.data.customer.relationType) setCustomerRelationType(res.data.customer.relationType);
+              if (res.data.customer.relationName) setCustomerRelationName(res.data.customer.relationName);
+              if (res.data.customer.address) setCustomerAddress(res.data.customer.address);
+            }
+
+            // Articles enrichment
+            if (res.data.articles && res.data.articles.length > 0) {
               setArticles(
                 res.data.articles.map((art: any) => ({
                   id: art.id,
@@ -343,7 +357,6 @@ export function EditModal({
                 }))
               );
             } else {
-              // Fallback single article initialized with pledge totals
               setArticles([
                 {
                   itemName: pledge.metalType === "Silver" ? "Silver Article" : "Gold Article",
@@ -356,22 +369,22 @@ export function EditModal({
                 },
               ]);
             }
-          })
-          .catch(() => {
-            setArticles([
-              {
-                itemName: pledge.metalType === "Silver" ? "Silver Article" : "Gold Article",
-                purity: pledge.metalType === "Silver" ? "92.5%" : "22K",
-                quantity: pledge.totalArticlesCount || 1,
-                grossWeight: pledge.totalGrossWeight || "0.000",
-                lessWeight: pledge.totalLessWeight || "0.000",
-                netWeight: pledge.totalNetWeight || "0.000",
-                loanAmount: pledge.totalLoanAmount || "0",
-              },
-            ]);
-          })
-          .finally(() => setIsLoadingArticles(false));
-      }
+          }
+        })
+        .catch(() => {
+          setArticles([
+            {
+              itemName: pledge.metalType === "Silver" ? "Silver Article" : "Gold Article",
+              purity: pledge.metalType === "Silver" ? "92.5%" : "22K",
+              quantity: pledge.totalArticlesCount || 1,
+              grossWeight: pledge.totalGrossWeight || "0.000",
+              lessWeight: pledge.totalLessWeight || "0.000",
+              netWeight: pledge.totalNetWeight || "0.000",
+              loanAmount: pledge.totalLoanAmount || "0",
+            },
+          ]);
+        })
+        .finally(() => setIsLoadingArticles(false));
     }
   }, [pledge, isOpen]);
 
@@ -391,7 +404,6 @@ export function EditModal({
 
       next[index] = target;
 
-      // Update total loan amount if single item
       if (field === "loanAmount" && next.length === 1) {
         setTotalLoanAmount(value);
       }
@@ -434,6 +446,14 @@ export function EditModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!customerMobile.trim()) {
+      toast.error("Customer mobile number cannot be empty.");
+      return;
+    }
+    if (!customerName.trim()) {
+      toast.error("Customer name cannot be empty.");
+      return;
+    }
     if (!pledgeNumber.trim()) {
       toast.error("Pledge number cannot be empty.");
       return;
@@ -455,6 +475,13 @@ export function EditModal({
         metalType,
         storageLocation: storageLocation.trim() || undefined,
         closureRemarks: remarks.trim() || undefined,
+        customer: {
+          name: customerName.trim(),
+          mobileNumber: customerMobile.trim(),
+          relationType: customerRelationType,
+          relationName: customerRelationName.trim() || undefined,
+          address: customerAddress.trim() || undefined,
+        },
         articles: articles.map((art) => {
           const gross = parseFloat(String(art.grossWeight)) || 0;
           const less = parseFloat(String(art.lessWeight || 0)) || 0;
@@ -479,10 +506,19 @@ export function EditModal({
 
       const res = await api.updatePledge(pledge.id, updateData);
       if (res.success) {
-        toast.success(`Pledge ${pledgeNumber} updated successfully!`);
+        toast.success(`Pledge ${pledgeNumber} and customer details updated successfully!`);
         onSuccess({
           ...pledge,
           ...updateData,
+          pledgeNumber: pledgeNumber.trim(),
+          customer: {
+            ...pledge.customer,
+            name: customerName.trim(),
+            mobileNumber: customerMobile.trim(),
+            relationType: customerRelationType as any,
+            relationName: customerRelationName.trim(),
+            address: customerAddress.trim(),
+          },
           totalLoanAmount: String(loanNum),
           totalGrossWeight: totalGrossCalculated,
           totalNetWeight: totalNetCalculated,
@@ -512,8 +548,7 @@ export function EditModal({
             <div>
               <h3 className="text-base font-bold">Edit Girvi Record (संशोधन)</h3>
               <p className="text-[11px] text-slate-400">
-                Customer: <strong className="text-white">{pledge.customer?.name}</strong> • Mobile:{" "}
-                {pledge.customer?.mobileNumber || "—"}
+                Pledge #{pledgeNumber || pledge.pledgeNumber} • Customer: {customerName || pledge.customer?.name}
               </p>
             </div>
           </div>
@@ -527,15 +562,101 @@ export function EditModal({
 
         {/* Form Body (Scrollable) */}
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5 max-h-[80vh] overflow-y-auto">
-          {/* Section 1: Pledge Identification & Terms */}
+          {/* Section 1: Customer Details (FULLY EDITABLE!) */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
+              <User className="h-3.5 w-3.5 text-amber-600" />
+              <span>1. Customer Information (ग्राहक का विवरण)</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Customer Mobile Number */}
+              <div>
+                <Label className="text-xs font-bold text-amber-900 mb-1.5 flex items-center gap-1">
+                  <Phone className="h-3 w-3 text-amber-600" />
+                  <span>Mobile Number (मोबाइल नंबर) *</span>
+                </Label>
+                <Input
+                  required
+                  value={customerMobile}
+                  onChange={(e) => setCustomerMobile(e.target.value)}
+                  placeholder="e.g. 9820123456"
+                  className="h-9 text-xs font-bold border-amber-300 bg-amber-50/20 text-slate-900 focus-visible:ring-amber-500"
+                />
+              </div>
+
+              {/* Customer Full Name */}
+              <div>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                  Customer Full Name (पूरा नाम) *
+                </Label>
+                <Input
+                  required
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="e.g. Ramesh Chandra Sharma"
+                  className="h-9 text-xs font-semibold text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Relation Type */}
+              <div>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                  Relation (संबंध)
+                </Label>
+                <select
+                  value={customerRelationType}
+                  onChange={(e) => setCustomerRelationType(e.target.value)}
+                  className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 font-medium"
+                >
+                  <option value="S/O">S/O (पुत्र)</option>
+                  <option value="D/O">D/O (पुत्री)</option>
+                  <option value="W/O">W/O (पत्नी)</option>
+                  <option value="C/O">C/O (के द्वारा)</option>
+                  <option value="O">Other</option>
+                </select>
+              </div>
+
+              {/* Relation / Father / Husband Name */}
+              <div className="sm:col-span-2">
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                  Father / Husband Name (पिता / पति का नाम)
+                </Label>
+                <Input
+                  value={customerRelationName}
+                  onChange={(e) => setCustomerRelationName(e.target.value)}
+                  placeholder="e.g. Kailash Chandra"
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Full Address */}
+            <div>
+              <Label className="text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
+                <MapPin className="h-3 w-3 text-slate-500" />
+                <span>Customer Address (पूरा पता)</span>
+              </Label>
+              <Input
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                placeholder="House No, Street, Landmark, City"
+                className="h-9 text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Section 2: Pledge Identification & Timeline */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
               <Hash className="h-3.5 w-3.5 text-amber-600" />
-              <span>1. Pledge Number & Timeline (गिरवी नंबर एवं अवधि)</span>
+              <span>2. Pledge Number & Timeline (गिरवी नंबर एवं अवधि)</span>
             </h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Pledge Number (EDITABLE!) */}
+              {/* Pledge Number (FULLY EDITABLE!) */}
               <div>
                 <Label className="text-xs font-bold text-amber-900 mb-1.5 block">
                   Pledge Number *
@@ -593,12 +714,12 @@ export function EditModal({
             )}
           </div>
 
-          {/* Section 2: Jewellery Articles (Item Name, Weights, Amount) */}
+          {/* Section 3: Jewellery Articles (Item Name, Weights, Amount) */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <Gem className="h-3.5 w-3.5 text-amber-600" />
-                <span>2. Jewellery Items & Weights (आभूषण विवरण एवं वजन)</span>
+                <span>3. Jewellery Items & Weights (आभूषण विवरण एवं वजन)</span>
               </h4>
               <Button
                 type="button"
@@ -632,7 +753,7 @@ export function EditModal({
                         <button
                           type="button"
                           onClick={() => removeArticle(index)}
-                          className="text-rose-600 hover:text-rose-800 text-xs flex items-center gap-0.5"
+                          className="text-rose-600 hover:text-rose-800 text-xs flex items-center gap-0.5 cursor-pointer"
                         >
                           <Trash2 className="h-3 w-3" />
                           <span>Remove</span>
@@ -650,7 +771,7 @@ export function EditModal({
                           required
                           value={art.itemName}
                           onChange={(e) => updateArticle(index, "itemName", e.target.value)}
-                          placeholder="e.g. 22K Gold Necklace"
+                          placeholder="e.g. 22K Gold Antique Necklace"
                           className="h-8 text-xs bg-white font-medium"
                         />
                       </div>
@@ -742,11 +863,11 @@ export function EditModal({
             )}
           </div>
 
-          {/* Section 3: Financial & Storage Details */}
+          {/* Section 4: Financial & Storage Details */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
               <Coins className="h-3.5 w-3.5 text-emerald-600" />
-              <span>3. Loan Amount & Storage (ऋण राशि एवं लॉकर)</span>
+              <span>4. Loan Amount & Storage (ऋण राशि एवं लॉकर)</span>
             </h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

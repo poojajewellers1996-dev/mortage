@@ -485,6 +485,18 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
         status: string;
         closedDate: string;
         metalType: string;
+        customerName: string;
+        customerMobile: string;
+        customerAddress: string;
+        customerRelationType: string;
+        customerRelationName: string;
+        customer: {
+          name?: string;
+          mobileNumber?: string;
+          relationType?: string;
+          relationName?: string;
+          address?: string;
+        };
         articles: Array<{
           id?: string;
           itemName: string;
@@ -532,7 +544,30 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
       if (body.closedDate !== undefined) updateData.closedDate = body.closedDate;
       if (body.metalType !== undefined) updateData.metalType = body.metalType;
 
+      const custName = body.customer?.name || body.customerName;
+      const custMobile = body.customer?.mobileNumber || body.customerMobile;
+      const custAddress = body.customer?.address || body.customerAddress;
+      const custRelType = body.customer?.relationType || body.customerRelationType;
+      const custRelName = body.customer?.relationName || body.customerRelationName;
+
       await db.transaction(async tx => {
+        // Update customer details if provided
+        if (custName || custMobile || custAddress || custRelType || custRelName !== undefined) {
+          const custUpdate: Record<string, unknown> = {
+            updatedAt: new Date(),
+          };
+          if (custName) custUpdate.name = custName.trim();
+          if (custMobile) custUpdate.mobileNumber = custMobile.trim();
+          if (custAddress !== undefined) custUpdate.address = custAddress.trim();
+          if (custRelType) custUpdate.relationType = custRelType;
+          if (custRelName !== undefined) custUpdate.relationName = custRelName.trim();
+
+          await tx
+            .update(customers)
+            .set(custUpdate)
+            .where(eq(customers.id, existing[0].customerId));
+        }
+
         // Update articles if provided
         if (body.articles && Array.isArray(body.articles) && body.articles.length > 0) {
           await tx.delete(pledgeArticles).where(eq(pledgeArticles.pledgeId, id));
@@ -596,6 +631,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
       });
 
       const updatedPledge = await db.select().from(pledges).where(eq(pledges.id, id)).limit(1);
+      const updatedCustomer = await db.select().from(customers).where(eq(customers.id, existing[0].customerId)).limit(1);
       const updatedArticles = await db.select().from(pledgeArticles).where(eq(pledgeArticles.pledgeId, id));
 
       await AuditService.log({
@@ -611,6 +647,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
         success: true,
         data: {
           ...updatedPledge[0],
+          customer: updatedCustomer[0] || null,
           articles: updatedArticles,
         },
         message: 'Pledge updated successfully',
