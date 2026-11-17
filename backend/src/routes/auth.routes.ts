@@ -10,6 +10,7 @@ import { AuditService } from '../services/audit.service.js';
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 export async function authRoutes(fastify: FastifyInstance) {
@@ -24,7 +25,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       });
     }
 
-    const { email, password } = parseResult.data;
+    const { email, password, rememberMe } = parseResult.data;
 
     try {
       const userList = await db
@@ -57,6 +58,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
       }
 
+      const tokenExpiresIn = rememberMe ? '12h' : '4h';
       const token = fastify.jwt.sign(
         {
           id: user.id,
@@ -64,7 +66,7 @@ export async function authRoutes(fastify: FastifyInstance) {
           role: user.role as 'admin' | 'staff',
           name: user.name,
         },
-        { expiresIn: '7d' }
+        { expiresIn: tokenExpiresIn }
       );
 
       await AuditService.log({
@@ -78,6 +80,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       return reply.send({
         success: true,
         token,
+        expiresIn: rememberMe ? 12 * 3600 : 4 * 3600,
         user: {
           id: user.id,
           name: user.name,

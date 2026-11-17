@@ -16,6 +16,24 @@ export class ApiError extends Error {
   }
 }
 
+export function getStoredAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem("girvi_token") || localStorage.getItem("girvi_token");
+}
+
+export function clearStoredAuth() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem("girvi_token");
+  sessionStorage.removeItem("girvi_user");
+  sessionStorage.removeItem("girvi_session_expires_at");
+  sessionStorage.removeItem("girvi_last_active");
+  localStorage.removeItem("girvi_token");
+  localStorage.removeItem("girvi_user");
+  localStorage.removeItem("girvi_session_expires_at");
+  localStorage.removeItem("girvi_last_active");
+  localStorage.removeItem("girvi_remember_me");
+}
+
 export async function apiFetch<T = any>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { params, headers, ...restOptions } = options;
 
@@ -34,7 +52,23 @@ export async function apiFetch<T = any>(endpoint: string, options: FetchOptions 
     }
   }
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("girvi_token") : null;
+  const token = getStoredAuthToken();
+
+  // Pre-flight check: if session has expired by timestamp, abort and redirect to login
+  if (typeof window !== "undefined" && token) {
+    const expiresAt = Number(
+      sessionStorage.getItem("girvi_session_expires_at") ||
+      localStorage.getItem("girvi_session_expires_at") ||
+      0
+    );
+    if (expiresAt > 0 && Date.now() > expiresAt) {
+      clearStoredAuth();
+      if (!window.location.pathname.includes("/login")) {
+        window.location.href = "/login?reason=expired";
+      }
+      throw new ApiError("Session has expired for security", 401);
+    }
+  }
 
   const requestHeaders = new Headers(headers);
   if (restOptions.body && !requestHeaders.has("Content-Type") && !(restOptions.body instanceof FormData)) {
@@ -55,10 +89,9 @@ export async function apiFetch<T = any>(endpoint: string, options: FetchOptions 
 
   if (!response.ok) {
     if (response.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("girvi_token");
-      localStorage.removeItem("girvi_user");
+      clearStoredAuth();
       if (!window.location.pathname.includes("/login")) {
-        window.location.href = "/login";
+        window.location.href = "/login?reason=expired";
       }
     }
     const message = (isJson && data?.error) || response.statusText || "Request failed";
@@ -71,8 +104,8 @@ export async function apiFetch<T = any>(endpoint: string, options: FetchOptions 
 // API Endpoints Services
 export const api = {
   // Auth
-  login: (credentials: { email: string; password: string }) =>
-    apiFetch<{ success: boolean; token: string; user: any }>("/api/auth/login", {
+  login: (credentials: { email: string; password: string; rememberMe?: boolean }) =>
+    apiFetch<{ success: boolean; token: string; user: any; expiresIn?: number }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify(credentials),
     }),
