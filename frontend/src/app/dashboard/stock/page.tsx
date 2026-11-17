@@ -80,8 +80,25 @@ export default function LockerStockPage() {
   const [customTo, setCustomTo] = useState<string>("");
   const [auditFilter, setAuditFilter] = useState<AuditFilter>("all");
 
-  // Physical Audit Checked Items (stored per pledge id)
-  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  // Physical Audit Checked Items (persisted in localStorage for convenience during safe verification)
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("girvi_audit_checked_items");
+        if (saved) return new Set(JSON.parse(saved));
+      } catch {}
+    }
+    return new Set();
+  });
+
+  // Save checked items to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("girvi_audit_checked_items", JSON.stringify(Array.from(checkedIds)));
+      } catch {}
+    }
+  }, [checkedIds]);
 
   // Sorting
   const [sortField, setSortField] = useState<"pledgeNumber" | "pledgeDate" | "netWeight" | "loanAmount">("pledgeNumber");
@@ -110,16 +127,19 @@ export default function LockerStockPage() {
     fetchStock();
   }, []);
 
-  // Dynamically extract all available series/letter prefixes from active stock
+  // Dynamically extract all available series/letter prefixes from active stock for the active metal tab
   const availableSeries = useMemo(() => {
     const map = new Map<string, number>();
     for (const item of stockData) {
+      if (activeTab === "gold" && item.metalType === "Silver") continue;
+      if (activeTab === "silver" && item.metalType !== "Silver") continue;
+
       const { prefix } = parsePledgeId(item.pledgeNumber);
       const key = prefix || "Others";
       map.set(key, (map.get(key) || 0) + 1);
     }
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [stockData]);
+  }, [stockData, activeTab]);
 
   // Determine preset box pills based on the currently selected series
   const relevantPresets = useMemo<{ id: BoxPreset; label: string }[]>(() => {
@@ -333,6 +353,16 @@ export default function LockerStockPage() {
     toast.info("Cleared audit check for current view");
   };
 
+  const clearAllAuditChecks = () => {
+    if (confirm("Reset the entire audit checklist? All verified checkmarks will be cleared.")) {
+      setCheckedIds(new Set());
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("girvi_audit_checked_items");
+      }
+      toast.info("Audit checklist reset.");
+    }
+  };
+
   const verifiedInViewCount = useMemo(() => {
     return filteredStock.filter((item) => checkedIds.has(item.id)).length;
   }, [filteredStock, checkedIds]);
@@ -489,10 +519,22 @@ export default function LockerStockPage() {
             <button
               onClick={clearCheckedVisible}
               className="text-slate-500 hover:text-slate-800 font-medium hover:underline px-1 py-0.5 cursor-pointer"
-              title="Uncheck all visible items"
+              title="Uncheck visible items in this view"
             >
-              Clear
+              Clear View
             </button>
+            {checkedIds.size > 0 && (
+              <>
+                <span className="text-slate-300">|</span>
+                <button
+                  onClick={clearAllAuditChecks}
+                  className="text-rose-600 hover:text-rose-800 font-medium hover:underline px-1 py-0.5 cursor-pointer"
+                  title="Reset all verified items"
+                >
+                  Reset All ({checkedIds.size})
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
