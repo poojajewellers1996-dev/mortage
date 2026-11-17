@@ -93,6 +93,23 @@ function ActiveRepledgePageInner() {
     fetchRepledges();
   }, []);
 
+  // Dynamic bank & pledger options (combines default presets with any custom ones in data)
+  const allBankOptions = useMemo(() => {
+    const set = new Set<string>(BANK_NAMES);
+    repledges.forEach((r) => {
+      if (r.bankName) set.add(r.bankName);
+    });
+    return Array.from(set);
+  }, [repledges]);
+
+  const allPledgerOptions = useMemo(() => {
+    const set = new Set<string>(PLEDGER_NAMES);
+    repledges.forEach((r) => {
+      if (r.pledgerName) set.add(r.pledgerName);
+    });
+    return Array.from(set);
+  }, [repledges]);
+
   // Filtered dataset
   const filteredRepledges = useMemo(() => {
     return repledges.filter((r) => {
@@ -344,10 +361,10 @@ function ActiveRepledgePageInner() {
             <select
               value={selectedBank}
               onChange={(e) => setSelectedBank(e.target.value)}
-              className="h-9 px-3 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800"
+              className="h-9 px-3 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 cursor-pointer"
             >
               <option value="all">All Banks (सभी बैंक)</option>
-              {BANK_NAMES.map((b) => (
+              {allBankOptions.map((b) => (
                 <option key={b} value={b}>
                   {b}
                 </option>
@@ -358,10 +375,10 @@ function ActiveRepledgePageInner() {
             <select
               value={selectedPledger}
               onChange={(e) => setSelectedPledger(e.target.value)}
-              className="h-9 px-3 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800"
+              className="h-9 px-3 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 cursor-pointer"
             >
               <option value="all">All Pledgers (सभी व्यक्ति)</option>
-              {PLEDGER_NAMES.map((p) => (
+              {allPledgerOptions.map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>

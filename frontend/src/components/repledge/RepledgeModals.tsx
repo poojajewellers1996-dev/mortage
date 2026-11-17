@@ -65,7 +65,13 @@ interface NewRepledgeModalProps {
 
 export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModalProps) {
   const [pledgerName, setPledgerName] = useState(PLEDGER_NAMES[0]);
+  const [isOtherPledger, setIsOtherPledger] = useState(false);
+  const [customPledgerName, setCustomPledgerName] = useState("");
+
   const [bankName, setBankName] = useState(BANK_NAMES[0]);
+  const [isOtherBank, setIsOtherBank] = useState(false);
+  const [customBankName, setCustomBankName] = useState("");
+
   const [bankPledgeNumber, setBankPledgeNumber] = useState("");
   const [bankPledgeDate, setBankPledgeDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [bankPledgeAmount, setBankPledgeAmount] = useState<string | number>("");
@@ -96,6 +102,12 @@ export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModa
         .finally(() => setIsLoadingPledges(false));
     } else {
       // Reset form
+      setPledgerName(PLEDGER_NAMES[0]);
+      setIsOtherPledger(false);
+      setCustomPledgerName("");
+      setBankName(BANK_NAMES[0]);
+      setIsOtherBank(false);
+      setCustomBankName("");
       setBankPledgeNumber("");
       setBankPledgeAmount("");
       setRemarks("");
@@ -141,6 +153,18 @@ export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const finalPledgerName = (isOtherPledger ? customPledgerName : pledgerName).trim().toUpperCase();
+    if (!finalPledgerName) {
+      toast.error("Please enter or select the Pledger Name.");
+      return;
+    }
+
+    const finalBankName = (isOtherBank ? customBankName : bankName).trim();
+    if (!finalBankName) {
+      toast.error("Please enter or select the Bank Name.");
+      return;
+    }
+
     if (!bankPledgeNumber.trim()) {
       toast.error("Please enter the Bank Pledge Number.");
       return;
@@ -158,8 +182,8 @@ export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModa
     setIsSubmitting(true);
     try {
       const res = await api.createRepledge({
-        pledgerName,
-        bankName,
+        pledgerName: finalPledgerName,
+        bankName: finalBankName,
         bankPledgeNumber: bankPledgeNumber.trim().toUpperCase(),
         bankPledgeDate,
         bankPledgeAmount: amt,
@@ -168,7 +192,7 @@ export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModa
       });
 
       if (res.success && res.data) {
-        toast.success(`Bank Re-Pledge #${bankPledgeNumber} created with ${bankName}!`);
+        toast.success(`Bank Re-Pledge #${bankPledgeNumber} created with ${finalBankName}!`);
         onSuccess(res.data);
         onClose();
       } else {
@@ -219,17 +243,27 @@ export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModa
 
             {/* Pledger Name Selection */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-800">
-                Name of the Pledger (किसके नाम पर रखा है) *
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-slate-800">
+                  Name of the Pledger (किसके नाम पर रखा है) *
+                </Label>
+                {isOtherPledger && (
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                    Custom Name (अन्य नाम)
+                  </span>
+                )}
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {PLEDGER_NAMES.map((name) => (
                   <button
                     key={name}
                     type="button"
-                    onClick={() => setPledgerName(name)}
+                    onClick={() => {
+                      setPledgerName(name);
+                      setIsOtherPledger(false);
+                    }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      pledgerName === name
+                      !isOtherPledger && pledgerName === name
                         ? "bg-[#0F1E36] text-white shadow-sm ring-2 ring-amber-500"
                         : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
                     }`}
@@ -237,22 +271,57 @@ export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModa
                     {name}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => setIsOtherPledger(true)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isOtherPledger
+                      ? "bg-[#0F1E36] text-white shadow-sm ring-2 ring-amber-500 font-extrabold"
+                      : "bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300"
+                  }`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Other (अन्य)</span>
+                </button>
               </div>
+
+              {isOtherPledger && (
+                <div className="pt-1.5 animate-in fade-in duration-150">
+                  <Input
+                    placeholder="Type custom pledger name (e.g. RAMESH, SURESH)"
+                    value={customPledgerName}
+                    onChange={(e) => setCustomPledgerName(e.target.value.toUpperCase())}
+                    className="h-9 text-xs font-bold uppercase bg-amber-50/50 border-amber-300 text-slate-900 placeholder:text-slate-400 placeholder:font-normal"
+                    autoFocus
+                    required
+                  />
+                </div>
+              )}
             </div>
 
             {/* Bank Name Selection */}
             <div className="space-y-1.5 pt-1">
-              <Label className="text-xs font-bold text-slate-800">
-                Bank Name (बैंक / संस्था का नाम) *
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-slate-800">
+                  Bank Name (बैंक / संस्था का नाम) *
+                </Label>
+                {isOtherBank && (
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                    Custom Bank / Financier (अन्य बैंक)
+                  </span>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2">
                 {BANK_NAMES.map((bName) => (
                   <button
                     key={bName}
                     type="button"
-                    onClick={() => setBankName(bName)}
+                    onClick={() => {
+                      setBankName(bName);
+                      setIsOtherBank(false);
+                    }}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      bankName === bName
+                      !isOtherBank && bankName === bName
                         ? "bg-amber-600 text-white shadow-sm ring-2 ring-amber-300"
                         : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
                     }`}
@@ -261,7 +330,32 @@ export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModa
                     <span>{bName}</span>
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => setIsOtherBank(true)}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isOtherBank
+                      ? "bg-amber-600 text-white shadow-sm ring-2 ring-amber-300 font-extrabold"
+                      : "bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300"
+                  }`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Other (अन्य बैंक)</span>
+                </button>
               </div>
+
+              {isOtherBank && (
+                <div className="pt-1.5 animate-in fade-in duration-150">
+                  <Input
+                    placeholder="Type custom bank or financier name (e.g. HDFC Bank, ICICI, Axis Bank)"
+                    value={customBankName}
+                    onChange={(e) => setCustomBankName(e.target.value)}
+                    className="h-9 text-xs font-bold bg-amber-50/50 border-amber-300 text-slate-900 placeholder:text-slate-400 placeholder:font-normal"
+                    autoFocus
+                    required
+                  />
+                </div>
+              )}
             </div>
 
             {/* Loan Terms: Bank Pledge Number, Date, Amount */}
@@ -467,7 +561,13 @@ export function EditRepledgeModal({
   onSuccess,
 }: EditRepledgeModalProps) {
   const [pledgerName, setPledgerName] = useState("");
+  const [isOtherPledger, setIsOtherPledger] = useState(false);
+  const [customPledgerName, setCustomPledgerName] = useState("");
+
   const [bankName, setBankName] = useState("");
+  const [isOtherBank, setIsOtherBank] = useState(false);
+  const [customBankName, setCustomBankName] = useState("");
+
   const [bankPledgeNumber, setBankPledgeNumber] = useState("");
   const [bankPledgeDate, setBankPledgeDate] = useState("");
   const [bankPledgeAmount, setBankPledgeAmount] = useState<string | number>("");
@@ -482,8 +582,28 @@ export function EditRepledgeModal({
 
   useEffect(() => {
     if (isOpen && repledge) {
-      setPledgerName(repledge.pledgerName || PLEDGER_NAMES[0]);
-      setBankName(repledge.bankName || BANK_NAMES[0]);
+      const initialPledger = repledge.pledgerName || PLEDGER_NAMES[0];
+      if (PLEDGER_NAMES.includes(initialPledger)) {
+        setPledgerName(initialPledger);
+        setIsOtherPledger(false);
+        setCustomPledgerName("");
+      } else {
+        setPledgerName("OTHER");
+        setIsOtherPledger(true);
+        setCustomPledgerName(initialPledger);
+      }
+
+      const initialBank = repledge.bankName || BANK_NAMES[0];
+      if (BANK_NAMES.includes(initialBank)) {
+        setBankName(initialBank);
+        setIsOtherBank(false);
+        setCustomBankName("");
+      } else {
+        setBankName("OTHER");
+        setIsOtherBank(true);
+        setCustomBankName(initialBank);
+      }
+
       setBankPledgeNumber(repledge.bankPledgeNumber || "");
       setBankPledgeDate(
         repledge.bankPledgeDate
@@ -574,6 +694,18 @@ export function EditRepledgeModal({
     e.preventDefault();
     if (!repledge) return;
 
+    const finalPledgerName = (isOtherPledger ? customPledgerName : pledgerName).trim().toUpperCase();
+    if (!finalPledgerName) {
+      toast.error("Please enter or select the Pledger Name.");
+      return;
+    }
+
+    const finalBankName = (isOtherBank ? customBankName : bankName).trim();
+    if (!finalBankName) {
+      toast.error("Please enter or select the Bank Name.");
+      return;
+    }
+
     if (!bankPledgeNumber.trim()) {
       toast.error("Please enter the Bank Pledge Number.");
       return;
@@ -591,8 +723,8 @@ export function EditRepledgeModal({
     setIsSubmitting(true);
     try {
       const res = await api.updateRepledge(repledge.id, {
-        pledgerName,
-        bankName,
+        pledgerName: finalPledgerName,
+        bankName: finalBankName,
         bankPledgeNumber: bankPledgeNumber.trim().toUpperCase(),
         bankPledgeDate,
         bankPledgeAmount: amt,
@@ -657,8 +789,15 @@ export function EditRepledgeModal({
                   Name of the Pledger (किसके नाम पर रखा) <span className="text-rose-500">*</span>
                 </Label>
                 <select
-                  value={pledgerName}
-                  onChange={(e) => setPledgerName(e.target.value)}
+                  value={isOtherPledger ? "OTHER" : pledgerName}
+                  onChange={(e) => {
+                    if (e.target.value === "OTHER") {
+                      setIsOtherPledger(true);
+                    } else {
+                      setIsOtherPledger(false);
+                      setPledgerName(e.target.value);
+                    }
+                  }}
                   className="w-full h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
                   required
                 >
@@ -667,7 +806,19 @@ export function EditRepledgeModal({
                       {name}
                     </option>
                   ))}
+                  <option value="OTHER">Other (अन्य व्यक्ति)...</option>
                 </select>
+
+                {isOtherPledger && (
+                  <Input
+                    placeholder="Type custom pledger name (e.g. RAMESH)"
+                    value={customPledgerName}
+                    onChange={(e) => setCustomPledgerName(e.target.value.toUpperCase())}
+                    className="h-9 text-xs font-bold uppercase mt-1.5 bg-amber-50/50 border-amber-300 text-slate-900"
+                    autoFocus
+                    required
+                  />
+                )}
               </div>
 
               {/* Bank Name */}
@@ -676,8 +827,15 @@ export function EditRepledgeModal({
                   Bank / Finance Name (बैंक का नाम) <span className="text-rose-500">*</span>
                 </Label>
                 <select
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
+                  value={isOtherBank ? "OTHER" : bankName}
+                  onChange={(e) => {
+                    if (e.target.value === "OTHER") {
+                      setIsOtherBank(true);
+                    } else {
+                      setIsOtherBank(false);
+                      setBankName(e.target.value);
+                    }
+                  }}
                   className="w-full h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
                   required
                 >
@@ -686,7 +844,19 @@ export function EditRepledgeModal({
                       {bank}
                     </option>
                   ))}
+                  <option value="OTHER">Other (अन्य बैंक)...</option>
                 </select>
+
+                {isOtherBank && (
+                  <Input
+                    placeholder="Type custom bank or financier name (e.g. HDFC Bank)"
+                    value={customBankName}
+                    onChange={(e) => setCustomBankName(e.target.value)}
+                    className="h-9 text-xs font-bold mt-1.5 bg-amber-50/50 border-amber-300 text-slate-900"
+                    autoFocus
+                    required
+                  />
+                )}
               </div>
 
               {/* Bank Pledge Number */}
