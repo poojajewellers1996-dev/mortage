@@ -25,6 +25,7 @@ import {
   Undo2,
   Layers,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 
 export const PLEDGER_NAMES = [
@@ -434,6 +435,452 @@ export function NewRepledgeModal({ isOpen, onClose, onSuccess }: NewRepledgeModa
             >
               <Landmark className="h-3.5 w-3.5" />
               <span>{isSubmitting ? "Creating..." : "Save Bank Re-Pledge"}</span>
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* EDIT BANK RE-PLEDGE MODAL                                                  */
+/* -------------------------------------------------------------------------- */
+interface EditRepledgeModalProps {
+  isOpen: boolean;
+  repledge: Repledge | null;
+  onClose: () => void;
+  onSuccess: (updatedRepledge: any) => void;
+}
+
+export function EditRepledgeModal({
+  isOpen,
+  repledge,
+  onClose,
+  onSuccess,
+}: EditRepledgeModalProps) {
+  const [pledgerName, setPledgerName] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [bankPledgeNumber, setBankPledgeNumber] = useState("");
+  const [bankPledgeDate, setBankPledgeDate] = useState("");
+  const [bankPledgeAmount, setBankPledgeAmount] = useState<string | number>("");
+  const [remarks, setRemarks] = useState("");
+
+  // Girvi selection
+  const [availablePledges, setAvailablePledges] = useState<Pledge[]>([]);
+  const [isLoadingPledges, setIsLoadingPledges] = useState(false);
+  const [girviSearch, setGirviSearch] = useState("");
+  const [selectedPledgeIds, setSelectedPledgeIds] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && repledge) {
+      setPledgerName(repledge.pledgerName || PLEDGER_NAMES[0]);
+      setBankName(repledge.bankName || BANK_NAMES[0]);
+      setBankPledgeNumber(repledge.bankPledgeNumber || "");
+      setBankPledgeDate(
+        repledge.bankPledgeDate
+          ? new Date(repledge.bankPledgeDate).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0]
+      );
+      setBankPledgeAmount(repledge.bankPledgeAmount || "");
+      setRemarks(repledge.remarks || "");
+
+      // Initial selected pledges from current repledge
+      const initialIds = (repledge.linkedPledges || []).map((p: any) => p.pledgeId || p.id);
+      setSelectedPledgeIds(initialIds);
+
+      // Fetch active pledges and combine with existing linked pledges
+      setIsLoadingPledges(true);
+      api
+        .getPledges({ status: "active", limit: "all" })
+        .then((res) => {
+          if (res.success && res.data) {
+            const fetched: Pledge[] = res.data;
+            const map = new Map<string, Pledge>();
+            fetched.forEach((p) => map.set(p.id, p));
+
+            // Ensure existing linked items are in map
+            (repledge.linkedPledges || []).forEach((lp: any) => {
+              const pid = lp.pledgeId || lp.id;
+              if (pid && !map.has(pid)) {
+                map.set(pid, {
+                  id: pid,
+                  pledgeNumber: lp.pledgeNumber,
+                  totalGrossWeight: lp.totalGrossWeight || "0",
+                  totalNetWeight: lp.totalNetWeight || "0",
+                  totalLoanAmount: lp.totalLoanAmount || "0",
+                  customer: {
+                    name: lp.customerName || "",
+                    mobileNumber: lp.customerMobile || "",
+                  },
+                } as unknown as Pledge);
+              }
+            });
+
+            setAvailablePledges(Array.from(map.values()));
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch pledges for edit repledge:", err);
+          toast.error("Failed to load active girvis.");
+        })
+        .finally(() => setIsLoadingPledges(false));
+    }
+  }, [isOpen, repledge]);
+
+  const filteredPledges = useMemo(() => {
+    if (!girviSearch.trim()) return availablePledges.slice(0, 30);
+    const q = girviSearch.trim().toLowerCase();
+    return availablePledges.filter(
+      (p) =>
+        p.pledgeNumber.toLowerCase().includes(q) ||
+        (p.customer?.name && p.customer.name.toLowerCase().includes(q)) ||
+        (p.customer?.mobileNumber && p.customer.mobileNumber.includes(q))
+    );
+  }, [availablePledges, girviSearch]);
+
+  const selectedPledgesList = useMemo(() => {
+    return availablePledges.filter((p) => selectedPledgeIds.includes(p.id));
+  }, [availablePledges, selectedPledgeIds]);
+
+  const totalGrossWeight = selectedPledgesList
+    .reduce((sum, p) => sum + (parseFloat(String(p.totalGrossWeight)) || 0), 0)
+    .toFixed(3);
+
+  const totalNetWeight = selectedPledgesList
+    .reduce((sum, p) => sum + (parseFloat(String(p.totalNetWeight)) || 0), 0)
+    .toFixed(3);
+
+  const totalOurLoanAmount = selectedPledgesList.reduce(
+    (sum, p) => sum + (parseFloat(String(p.totalLoanAmount)) || 0),
+    0
+  );
+
+  const toggleSelectPledge = (id: string) => {
+    setSelectedPledgeIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!repledge) return;
+
+    if (!bankPledgeNumber.trim()) {
+      toast.error("Please enter the Bank Pledge Number.");
+      return;
+    }
+    const amt = parseFloat(String(bankPledgeAmount));
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Please enter a valid Bank Pledge Amount.");
+      return;
+    }
+    if (selectedPledgeIds.length === 0) {
+      toast.error("Please select at least one of our Girvis to remain linked.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await api.updateRepledge(repledge.id, {
+        pledgerName,
+        bankName,
+        bankPledgeNumber: bankPledgeNumber.trim().toUpperCase(),
+        bankPledgeDate,
+        bankPledgeAmount: amt,
+        pledgeIds: selectedPledgeIds,
+        remarks: remarks.trim() || undefined,
+      });
+
+      if (res.success && res.data) {
+        toast.success(`Bank Re-Pledge #${bankPledgeNumber} updated successfully!`);
+        onSuccess(res.data);
+        onClose();
+      } else {
+        toast.error((res as any).error || "Failed to update bank re-pledge.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update bank re-pledge.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen || !repledge) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-8">
+        {/* Modal Header */}
+        <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 p-4 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+              <Pencil className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold">Edit Bank Re-Pledge (री-प्लेज संशोधन)</h2>
+              <p className="text-xs text-amber-100">
+                Update bank details, pledger name, loan amount, or modify linked girvis
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Modal Form */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-5 max-h-[80vh] overflow-y-auto">
+          {/* Section 1: Bank & Pledger Details */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-100">
+              <Landmark className="h-3.5 w-3.5 text-amber-700" />
+              <span>1. Bank & Pledger Information</span>
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* Name of Pledger */}
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">
+                  Name of the Pledger (किसके नाम पर रखा) <span className="text-rose-500">*</span>
+                </Label>
+                <select
+                  value={pledgerName}
+                  onChange={(e) => setPledgerName(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                  required
+                >
+                  {PLEDGER_NAMES.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Bank Name */}
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">
+                  Bank / Finance Name (बैंक का नाम) <span className="text-rose-500">*</span>
+                </Label>
+                <select
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                  required
+                >
+                  {BANK_NAMES.map((bank) => (
+                    <option key={bank} value={bank}>
+                      {bank}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Bank Pledge Number */}
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">
+                  Bank Pledge Number (बैंक पावती नंबर) <span className="text-rose-500">*</span>
+                </Label>
+                <Input
+                  value={bankPledgeNumber}
+                  onChange={(e) => setBankPledgeNumber(e.target.value.toUpperCase())}
+                  placeholder="e.g. KOS-10294, MUT-8821"
+                  required
+                  className="h-9 text-xs font-mono font-bold"
+                />
+              </div>
+
+              {/* Bank Pledge Date */}
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">
+                  Bank Pledge Date (बैंक में रखने की तारीख) <span className="text-rose-500">*</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={bankPledgeDate}
+                  onChange={(e) => setBankPledgeDate(e.target.value)}
+                  required
+                  className="h-9 text-xs font-medium"
+                />
+              </div>
+
+              {/* Bank Pledge Amount */}
+              <div className="space-y-1 sm:col-span-2">
+                <Label className="text-xs font-bold text-slate-700">
+                  Bank Pledge Loan Amount (₹ बैंक से उठाया गया लोन) <span className="text-rose-500">*</span>
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">₹</span>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="e.g. 150000"
+                    value={bankPledgeAmount}
+                    onChange={(e) => setBankPledgeAmount(e.target.value)}
+                    required
+                    className="pl-7 h-9 text-sm font-bold text-emerald-800"
+                  />
+                </div>
+                {bankPledgeAmount && !isNaN(Number(bankPledgeAmount)) && (
+                  <p className="text-[11px] font-semibold text-emerald-700">
+                    {formatIndianCurrency(Number(bankPledgeAmount))}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Which Items / Our Girvi Number (Merge Multi-Girvi) */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-1 border-b border-slate-100">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-amber-700" />
+                <span>2. Linked Girvi Pledges (हमारी गिरवी नंबर)</span>
+                <span className="text-rose-500">*</span>
+              </h3>
+              <span className="text-xs text-slate-500">
+                Selected: <strong className="text-amber-800 font-bold">{selectedPledgeIds.length} Girvis</strong>
+              </span>
+            </div>
+
+            {/* Girvi Search */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <Input
+                value={girviSearch}
+                onChange={(e) => setGirviSearch(e.target.value)}
+                placeholder="Search our pledge # (e.g. C4254, C4255) or customer name..."
+                className="pl-8 h-8 text-xs bg-slate-50"
+              />
+            </div>
+
+            {/* Pledges Selection Box */}
+            <div className="border border-slate-200 rounded-xl max-h-52 overflow-y-auto divide-y divide-slate-100 bg-white">
+              {isLoadingPledges ? (
+                <div className="p-6 text-center text-xs text-slate-500">Loading active girvis...</div>
+              ) : filteredPledges.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500">
+                  No active girvis matching search.
+                </div>
+              ) : (
+                filteredPledges.map((p) => {
+                  const isSelected = selectedPledgeIds.includes(p.id);
+                  const isCurrentlyInThis = (repledge.linkedPledges || []).some(
+                    (lp: any) => (lp.pledgeId || lp.id) === p.id
+                  );
+
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => toggleSelectPledge(p.id)}
+                      className={`p-2.5 flex items-center justify-between gap-3 cursor-pointer text-xs transition-colors ${
+                        isSelected ? "bg-amber-50/70 hover:bg-amber-100/50" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                            isSelected
+                              ? "bg-amber-600 border-amber-600 text-white"
+                              : "border-slate-300 bg-white"
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-slate-900">{p.pledgeNumber}</span>
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                p.metalType === "Silver"
+                                  ? "bg-slate-200 text-slate-800"
+                                  : "bg-amber-100 text-amber-900"
+                              }`}
+                            >
+                              {p.metalType || "Gold"}
+                            </span>
+                            {isCurrentlyInThis && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                Current Link
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate">
+                            {p.customer?.name} • {p.totalArticlesCount || 1} pcs
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="font-bold text-slate-800 block">
+                          {formatWeight(p.totalNetWeight)}
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-800">
+                          {formatIndianCurrency(p.totalLoanAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Selected Summary Pill Badge */}
+            {selectedPledgesList.length > 0 && (
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-700" />
+                    <span>Merged Girvis: {selectedPledgesList.map((p) => p.pledgeNumber).join(", ")}</span>
+                  </span>
+                  <p className="text-[11px] text-amber-800">
+                    Total {selectedPledgesList.length} girvi pledge(s) will be linked under this bank re-pledge.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 font-bold text-amber-950">
+                  <span>Gross: {totalGrossWeight} g</span>
+                  <span>•</span>
+                  <span>Net: {totalNetWeight} g</span>
+                  <span>•</span>
+                  <span className="text-emerald-900">
+                    Our Loan: {formatIndianCurrency(totalOurLoanAmount)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Optional Remarks */}
+          <div className="space-y-1">
+            <Label className="text-xs font-bold text-slate-700">Remarks / Notes (टिप्पणी)</Label>
+            <Input
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="e.g. Updated pledge details at branch"
+              className="h-9 text-xs"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSubmitting || selectedPledgeIds.length === 0}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold gap-1.5 cursor-pointer"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              <span>{isSubmitting ? "Saving..." : "Save Changes"}</span>
             </Button>
           </div>
         </form>

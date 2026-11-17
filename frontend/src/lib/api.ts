@@ -246,6 +246,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  updateRepledge: (id: string, data: any) =>
+    apiFetch<{ success: boolean; data: any; message: string }>(`/api/repledges/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   releaseRepledge: (id: string, data: { releasedDate?: string; releaseRemarks?: string }) =>
     apiFetch<{ success: boolean; data: any; message: string }>(`/api/repledges/${id}/release`, {
       method: "POST",

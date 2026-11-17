@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { formatIndianCurrency, formatWeight } from "@/lib/number-to-words";
 import {
   NewRepledgeModal,
+  EditRepledgeModal,
   ReleaseRepledgeModal,
   ViewRepledgeModal,
   DeleteRepledgeModal,
@@ -36,6 +37,7 @@ import {
   Undo2,
   Sparkles,
   ExternalLink,
+  Pencil,
 } from "lucide-react";
 
 type SortField = "bankPledgeNumber" | "bankName" | "pledgerName" | "bankPledgeDate" | "weight" | "amount";
@@ -57,6 +59,7 @@ function ActiveRepledgePageInner() {
 
   // Modals state
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [editModalRepledge, setEditModalRepledge] = useState<Repledge | null>(null);
   const [releaseModalRepledge, setReleaseModalRepledge] = useState<Repledge | null>(null);
   const [viewModalRepledge, setViewModalRepledge] = useState<Repledge | null>(null);
   const [deleteModalRepledge, setDeleteModalRepledge] = useState<Repledge | null>(null);
@@ -448,6 +451,16 @@ function ActiveRepledgePageInner() {
                             <Eye className="h-3.5 w-3.5" />
                           </button>
 
+                          {/* Edit Button */}
+                          <button
+                            type="button"
+                            onClick={() => setEditModalRepledge(r)}
+                            className="p-1 rounded text-slate-500 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                            title="Edit Re-Pledge Details (संशोधन)"
+                          >
+                            <Pencil className="h-3.5 w-3.5 text-amber-600" />
+                          </button>
+
                           {/* Delete Button */}
                           <button
                             type="button"
@@ -473,6 +486,16 @@ function ActiveRepledgePageInner() {
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
         onSuccess={() => fetchRepledges()}
+      />
+
+      <EditRepledgeModal
+        isOpen={!!editModalRepledge}
+        repledge={editModalRepledge}
+        onClose={() => setEditModalRepledge(null)}
+        onSuccess={() => {
+          setEditModalRepledge(null);
+          fetchRepledges();
+        }}
       />
 
       <ReleaseRepledgeModal

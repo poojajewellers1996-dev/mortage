@@ -324,6 +324,265 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // PUT /api/repledges/:id - Edit an existing re-pledge
+  fastify.put('/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parse = updateRepledgeSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Validation failed',
+        details: parse.error.format(),
+      });
+    }
+
+    const data = parse.data;
+
+    try {
+      const existingList = await db.select().from(repledges).where(eq(repledges.id, id)).limit(1);
+      if (existingList.length === 0) {
+        return reply.status(404).send({ success: false, error: 'Re-pledge record not found' });
+      }
+
+      const existing = existingList[0];
+      const newBankName = data.bankName || existing.bankName;
+      const newPledgerName = data.pledgerName || existing.pledgerName;
+      const newPledgeNum = data.bankPledgeNumber ? data.bankPledgeNumber.trim().toUpperCase() : existing.bankPledgeNumber;
+      const newPledgeDate = data.bankPledgeDate || existing.bankPledgeDate;
+      const newPledgeAmount = data.bankPledgeAmount !== undefined ? data.bankPledgeAmount : parseFloat(existing.bankPledgeAmount);
+      const newRemarks = data.remarks !== undefined ? data.remarks : existing.remarks;
+
+      // Check if bank pledge number changed, and ensure it's not duplicate with another repledge
+      if (data.bankPledgeNumber && data.bankPledgeNumber.trim().toUpperCase() !== existing.bankPledgeNumber) {
+        const dupCheck = await db
+          .select({ id: repledges.id })
+          .from(repledges)
+          .where(
+            and(
+              eq(repledges.bankPledgeNumber, data.bankPledgeNumber.trim().toUpperCase()),
+              sql`${repledges.id} != ${id}::uuid`
+            )
+          )
+          .limit(1);
+
+        if (dupCheck.length > 0) {
+          return reply.status(400).send({
+            success: false,
+            error: `Another bank re-pledge already exists with number #${data.bankPledgeNumber.trim().toUpperCase()}`,
+          });
+        }
+      }
+
+      // Existing linked pledges
+      const existingLinks = await db
+        .select()
+        .from(repledgePledges)
+        .where(eq(repledgePledges.repledgeId, id));
+      const existingPledgeIds = existingLinks.map(l => l.pledgeId);
+
+      // Desired linked pledges (if provided in update body, otherwise keep existing)
+      const targetPledgeIds = data.pledgeIds && data.pledgeIds.length > 0 ? data.pledgeIds : existingPledgeIds;
+
+      // Identify added and removed pledges
+      const addedPledgeIds = targetPledgeIds.filter(pid => !existingPledgeIds.includes(pid));
+      const removedPledgeIds = existingPledgeIds.filter(pid => !targetPledgeIds.includes(pid));
+
+      // Fetch target pledges to calculate updated total weights and our loan amounts
+      const targetPledges = await db
+        .select()
+        .from(pledges)
+        .where(inArray(pledges.id, targetPledgeIds));
+
+      if (targetPledges.length === 0) {
+        return reply.status(400).send({
+          success: false,
+          error: 'At least one valid active girvi must remain linked to this re-pledge',
+        });
+      }
+
+      const totalGrossWeight = targetPledges.reduce(
+        (sum, p) => sum + (parseFloat(p.totalGrossWeight) || 0),
+        0
+      );
+      const totalNetWeight = targetPledges.reduce(
+        (sum, p) => sum + (parseFloat(p.totalNetWeight) || 0),
+        0
+      );
+      const totalOurLoanAmount = targetPledges.reduce(
+        (sum, p) => sum + (parseFloat(p.totalLoanAmount) || 0),
+        0
+      );
+      const pledgeNumbers = targetPledges.map(p => p.pledgeNumber);
+
+      await db.transaction(async tx => {
+        // 1. If removed pledges exist, unlink them
+        for (const pid of removedPledgeIds) {
+          // Remove link from repledgePledges
+          await tx
+            .delete(repledgePledges)
+            .where(
+              and(
+                eq(repledgePledges.repledgeId, id),
+                eq(repledgePledges.pledgeId, pid)
+              )
+            );
+
+          // Check if pid is linked to any other active bank re-pledge
+          const otherActiveLinks = await tx
+            .select({ bankName: repledges.bankName, id: repledges.id })
+            .from(repledgePledges)
+            .innerJoin(repledges, eq(repledgePledges.repledgeId, repledges.id))
+            .where(
+              and(
+                eq(repledgePledges.pledgeId, pid),
+                sql`${repledges.id} != ${id}::uuid`,
+                eq(repledges.status, 'active')
+              )
+            );
+
+          if (otherActiveLinks.length > 0) {
+            const remainingBanks = Array.from(
+              new Set(otherActiveLinks.map(l => l.bankName))
+            ).join(', ');
+
+            await tx
+              .update(pledges)
+              .set({
+                isRepledged: true,
+                repledgeId: otherActiveLinks[0].id,
+                repledgedBankName: remainingBanks,
+                updatedAt: new Date(),
+              })
+              .where(eq(pledges.id, pid));
+
+            await tx
+              .update(pledgeArticles)
+              .set({
+                isRepledged: true,
+                repledgedBankName: remainingBanks,
+                updatedAt: new Date(),
+              })
+              .where(eq(pledgeArticles.pledgeId, pid));
+          } else {
+            await tx
+              .update(pledges)
+              .set({
+                isRepledged: false,
+                repledgeId: null,
+                repledgedBankName: null,
+                updatedAt: new Date(),
+              })
+              .where(eq(pledges.id, pid));
+
+            await tx
+              .update(pledgeArticles)
+              .set({
+                isRepledged: false,
+                repledgedBankName: null,
+                updatedAt: new Date(),
+              })
+              .where(eq(pledgeArticles.pledgeId, pid));
+          }
+        }
+
+        // 2. If new pledges are added, insert link and mark as repledged
+        for (const pid of addedPledgeIds) {
+          await tx.insert(repledgePledges).values({
+            repledgeId: id,
+            pledgeId: pid,
+          });
+        }
+
+        // 3. For all target pledges, update repledgedBankName if bankName changed or newly added
+        for (const pid of targetPledgeIds) {
+          const allActiveLinks = await tx
+            .select({ bankName: repledges.bankName, id: repledges.id })
+            .from(repledgePledges)
+            .innerJoin(repledges, eq(repledgePledges.repledgeId, repledges.id))
+            .where(
+              and(
+                eq(repledgePledges.pledgeId, pid),
+                eq(repledges.status, 'active')
+              )
+            );
+
+          const currentBankSet = new Set(allActiveLinks.map(l => (l.id === id ? newBankName : l.bankName)));
+          currentBankSet.add(newBankName);
+          const combinedBanks = Array.from(currentBankSet).join(', ');
+
+          await tx
+            .update(pledges)
+            .set({
+              isRepledged: true,
+              repledgeId: id,
+              repledgedBankName: combinedBanks,
+              updatedAt: new Date(),
+            })
+            .where(eq(pledges.id, pid));
+
+          await tx
+            .update(pledgeArticles)
+            .set({
+              isRepledged: true,
+              repledgedBankName: combinedBanks,
+              updatedAt: new Date(),
+            })
+            .where(eq(pledgeArticles.pledgeId, pid));
+        }
+
+        // 4. Update the repledge record itself
+        await tx
+          .update(repledges)
+          .set({
+            pledgerName: newPledgerName,
+            bankName: newBankName,
+            bankPledgeNumber: newPledgeNum,
+            bankPledgeDate: newPledgeDate,
+            bankPledgeAmount: String(newPledgeAmount),
+            totalGrossWeight: totalGrossWeight.toFixed(3),
+            totalNetWeight: totalNetWeight.toFixed(3),
+            totalOurLoanAmount: totalOurLoanAmount.toFixed(2),
+            linkedPledgeNumbers: pledgeNumbers,
+            remarks: newRemarks,
+            updatedAt: new Date(),
+          })
+          .where(eq(repledges.id, id));
+      });
+
+      const updated = await db.select().from(repledges).where(eq(repledges.id, id)).limit(1);
+
+      const user = (request as any).user;
+      await AuditService.log({
+        userId: user?.id,
+        action: 'UPDATE_REPLEDGE',
+        entityName: 'repledges',
+        entityId: id,
+        details: {
+          pledgerName: newPledgerName,
+          bankName: newBankName,
+          bankPledgeNumber: newPledgeNum,
+          bankPledgeAmount: newPledgeAmount,
+          linkedPledges: pledgeNumbers,
+        },
+      });
+
+      return reply.send({
+        success: true,
+        data: {
+          ...updated[0],
+          linkedPledges: targetPledges,
+        },
+        message: `Bank Re-pledge #${newPledgeNum} updated successfully`,
+      });
+    } catch (err: any) {
+      request.log.error(err);
+      return reply.status(500).send({
+        success: false,
+        error: err.message || 'Failed to update re-pledge',
+      });
+    }
+  });
+
   // POST /api/repledges/:id/release - Release bank repledge and UNLINK our girvis
   fastify.post('/:id/release', async (request, reply) => {
     const { id } = request.params as { id: string };
