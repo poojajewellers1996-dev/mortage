@@ -232,22 +232,66 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <div className="space-y-1 sm:col-span-2">
-                <Label>Shop Address</Label>
+            {/* Shop Address */}
+            <div className="space-y-1 pt-2">
+              <Label>Shop Address (दुकान का पता)</Label>
+              <Input
+                value={settings.addressLine1 || ""}
+                onChange={(e) => setSettings({ ...settings, addressLine1: e.target.value })}
+                placeholder="e.g. Main Road, Budigere, Devanahalli Taluk"
+                disabled={!isAdmin}
+              />
+            </div>
+
+            {/* City, State, Pincode in 3 clean separate columns */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label>City / Town (शहर) *</Label>
                 <Input
-                  value={settings.addressLine1 || ""}
-                  onChange={(e) => setSettings({ ...settings, addressLine1: e.target.value })}
+                  value={settings.city || ""}
+                  onChange={(e) => setSettings({ ...settings, city: e.target.value })}
+                  placeholder="e.g. Bangalore, Devanahalli"
                   disabled={!isAdmin}
+                  required
                 />
               </div>
+
               <div className="space-y-1">
-                <Label>City / State / PIN</Label>
+                <Label>State (राज्य) *</Label>
                 <Input
-                  value={`${settings.city || "Mumbai"}, ${settings.state || "MH"} - ${settings.pincode || ""}`}
-                  onChange={(e) => setSettings({ ...settings, city: e.target.value })}
+                  value={settings.state || ""}
+                  onChange={(e) => setSettings({ ...settings, state: e.target.value })}
+                  placeholder="e.g. Karnataka"
+                  disabled={!isAdmin}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label>Pincode (पिन कोड) *</Label>
+                <Input
+                  value={settings.pincode || ""}
+                  onChange={(e) => setSettings({ ...settings, pincode: e.target.value })}
+                  placeholder="e.g. 562129"
+                  disabled={!isAdmin}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Default Pledge Prefix */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="space-y-1">
+                <Label>Default Pledge Prefix (सीरीज़ अक्षर)</Label>
+                <Input
+                  value={settings.defaultPledgePrefix || "C"}
+                  onChange={(e) => setSettings({ ...settings, defaultPledgePrefix: e.target.value.toUpperCase() })}
+                  placeholder="e.g. C, B"
                   disabled={!isAdmin}
                 />
+                <p className="text-[11px] text-slate-500">
+                  Default series prefix for new girvi pledges (e.g. C for C4768)
+                </p>
               </div>
             </div>
           </CardContent>

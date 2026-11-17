@@ -64,7 +64,7 @@ export default function NewGirviPage() {
     email: "",
     monthlyIncome: "",
     address: "",
-    city: "Mumbai",
+    city: "Bangalore",
     pincode: "",
     photoUrl: null,
   });
@@ -105,7 +105,7 @@ export default function NewGirviPage() {
       email: selected.email || "",
       monthlyIncome: selected.monthlyIncome || "",
       address: selected.address,
-      city: selected.city || "Mumbai",
+      city: selected.city || "Bangalore",
       pincode: selected.pincode || "",
       photoUrl: selected.photoUrl || null,
     });
@@ -241,7 +241,7 @@ export default function NewGirviPage() {
           email: customer.email || null,
           monthlyIncome: customer.monthlyIncome ? String(customer.monthlyIncome) : "0",
           address: customer.address.trim(),
-          city: customer.city || "Mumbai",
+          city: customer.city || "Bangalore",
           pincode: customer.pincode || null,
           photoUrl: customer.photoUrl || null,
         };
@@ -290,7 +290,7 @@ export default function NewGirviPage() {
         email: "",
         monthlyIncome: "",
         address: "",
-        city: "Mumbai",
+        city: "Bangalore",
         pincode: "",
         photoUrl: null,
       });

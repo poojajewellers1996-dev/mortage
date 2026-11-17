@@ -45,7 +45,7 @@ export default function CustomersPage() {
     secondaryMobile: "",
     monthlyIncome: "",
     address: "",
-    city: "Mumbai",
+    city: "Budigere",
     pincode: "",
     photoUrl: null as string | null,
   });
@@ -91,7 +91,7 @@ export default function CustomersPage() {
           secondaryMobile: "",
           monthlyIncome: "",
           address: "",
-          city: "Mumbai",
+          city: "Budigere",
           pincode: "",
           photoUrl: null,
         });
@@ -364,12 +364,31 @@ export default function CustomersPage() {
                 </Label>
                 <textarea
                   rows={2}
-                  placeholder="Complete postal address"
+                  placeholder="Complete postal address / Village"
                   value={newCust.address}
                   onChange={(e) => setNewCust({ ...newCust, address: e.target.value })}
                   required
                   className="flex w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 resize-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>City / Town / Village</Label>
+                  <Input
+                    placeholder="e.g. Budigere, Bangalore"
+                    value={newCust.city}
+                    onChange={(e) => setNewCust({ ...newCust, city: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>PIN Code</Label>
+                  <Input
+                    placeholder="e.g. 562129"
+                    value={newCust.pincode}
+                    onChange={(e) => setNewCust({ ...newCust, pincode: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3">

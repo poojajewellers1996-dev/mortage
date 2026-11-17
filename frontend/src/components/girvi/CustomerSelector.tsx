@@ -230,6 +230,27 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
           />
         </div>
 
+        {/* City and PIN Code */}
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="customerCity">City / Town / Village</Label>
+          <Input
+            id="customerCity"
+            placeholder="e.g. Budigere, Bangalore"
+            value={customer.city || ""}
+            onChange={(e) => onChange("city", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5 sm:col-span-1">
+          <Label htmlFor="customerPincode">PIN Code</Label>
+          <Input
+            id="customerPincode"
+            placeholder="e.g. 562129"
+            value={customer.pincode || ""}
+            onChange={(e) => onChange("pincode", e.target.value)}
+          />
+        </div>
+
         {/* Customer Photograph */}
         <div className="space-y-1.5 sm:col-span-3 pt-2">
           <Label>Customer Photograph (KYC Requirement)</Label>
