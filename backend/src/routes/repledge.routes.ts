@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { repledges, repledgePledges, pledges, pledgeArticles, customers } from '../db/schema.js';
+import { repledges, repledgePledges, repledgeInterestPayments, pledges, pledgeArticles, customers } from '../db/schema.js';
 import { eq, or, and, ilike, desc, sql, inArray } from 'drizzle-orm';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { AuditService } from '../services/audit.service.js';
@@ -48,6 +48,15 @@ const updateRepledgeSchema = z.object({
 const releaseRepledgeSchema = z.object({
   releasedDate: z.string().default(() => new Date().toISOString().split('T')[0]),
   releaseRemarks: z.string().optional().nullable(),
+});
+
+const addRepledgeInterestSchema = z.object({
+  paymentDate: z.string().default(() => new Date().toISOString().split('T')[0]),
+  amount: z.number().positive('Interest amount must be greater than 0'),
+  forMonth: z.string().optional().nullable(),
+  paymentMode: z.string().default('Online / Bank Transfer'),
+  referenceNumber: z.string().optional().nullable(),
+  remarks: z.string().optional().nullable(),
 });
 
 export async function repledgeRoutes(fastify: FastifyInstance) {
@@ -807,6 +816,185 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({
         success: false,
         error: err.message || 'Failed to delete repledge',
+      });
+    }
+  });
+
+  // GET /api/repledges/:id/interest - Get all interest payment entries for a bank re-pledge
+  fastify.get('/:id/interest', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    try {
+      const existing = await db.select().from(repledges).where(eq(repledges.id, id)).limit(1);
+      if (existing.length === 0) {
+        return reply.status(404).send({ success: false, error: 'Re-pledge record not found' });
+      }
+
+      const paymentsList = await db
+        .select()
+        .from(repledgeInterestPayments)
+        .where(eq(repledgeInterestPayments.repledgeId, id))
+        .orderBy(desc(repledgeInterestPayments.paymentDate), desc(repledgeInterestPayments.createdAt));
+
+      const totalPaid = paymentsList.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+      return reply.send({
+        success: true,
+        data: paymentsList,
+        totalInterestPaid: totalPaid.toFixed(2),
+        paymentCount: paymentsList.length,
+        bankPledgeNumber: existing[0].bankPledgeNumber,
+        bankName: existing[0].bankName,
+        bankPledgeAmount: existing[0].bankPledgeAmount,
+      });
+    } catch (err: any) {
+      request.log.error(err);
+      return reply.status(500).send({
+        success: false,
+        error: err.message || 'Failed to fetch interest payments',
+      });
+    }
+  });
+
+  // POST /api/repledges/:id/interest - Record a monthly interest payment to the bank
+  fastify.post('/:id/interest', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parse = addRepledgeInterestSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Validation failed',
+        details: parse.error.format(),
+      });
+    }
+
+    const { paymentDate, amount, forMonth, paymentMode, referenceNumber, remarks } = parse.data;
+
+    try {
+      const existing = await db.select().from(repledges).where(eq(repledges.id, id)).limit(1);
+      if (existing.length === 0) {
+        return reply.status(404).send({ success: false, error: 'Re-pledge record not found' });
+      }
+
+      const user = (request as any).user;
+
+      let newPayment: any;
+      let newTotal = 0;
+
+      await db.transaction(async tx => {
+        // Insert payment entry
+        const [inserted] = await tx
+          .insert(repledgeInterestPayments)
+          .values({
+            repledgeId: id,
+            paymentDate,
+            amount: amount.toFixed(2),
+            forMonth: forMonth ? forMonth.trim() : null,
+            paymentMode,
+            referenceNumber: referenceNumber ? referenceNumber.trim() : null,
+            remarks: remarks ? remarks.trim() : null,
+            paidBy: user?.id || null,
+          })
+          .returning();
+        newPayment = inserted;
+
+        // Recalculate total interest paid for this repledge
+        const allPayments = await tx
+          .select({ amount: repledgeInterestPayments.amount })
+          .from(repledgeInterestPayments)
+          .where(eq(repledgeInterestPayments.repledgeId, id));
+
+        newTotal = allPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+        // Update total_interest_paid on repledges record
+        await tx
+          .update(repledges)
+          .set({
+            totalInterestPaid: newTotal.toFixed(2),
+            updatedAt: new Date(),
+          })
+          .where(eq(repledges.id, id));
+      });
+
+      await AuditService.log({
+        userId: user?.id,
+        action: 'ADD_REPLEDGE_INTEREST',
+        entityName: 'repledges',
+        entityId: id,
+        details: {
+          bankPledgeNumber: existing[0].bankPledgeNumber,
+          bankName: existing[0].bankName,
+          amount,
+          paymentDate,
+          forMonth,
+          paymentMode,
+          totalInterestPaidNow: newTotal.toFixed(2),
+        },
+      });
+
+      return reply.status(201).send({
+        success: true,
+        message: `Interest payment of ₹${amount} recorded for ${existing[0].bankName} #${existing[0].bankPledgeNumber}`,
+        data: newPayment,
+        totalInterestPaid: newTotal.toFixed(2),
+      });
+    } catch (err: any) {
+      request.log.error(err);
+      return reply.status(500).send({
+        success: false,
+        error: err.message || 'Failed to record interest payment',
+      });
+    }
+  });
+
+  // DELETE /api/repledges/:id/interest/:paymentId - Delete an interest payment entry
+  fastify.delete('/:id/interest/:paymentId', async (request, reply) => {
+    const { id, paymentId } = request.params as { id: string; paymentId: string };
+
+    try {
+      const existing = await db.select().from(repledges).where(eq(repledges.id, id)).limit(1);
+      if (existing.length === 0) {
+        return reply.status(404).send({ success: false, error: 'Re-pledge record not found' });
+      }
+
+      let newTotal = 0;
+      await db.transaction(async tx => {
+        await tx
+          .delete(repledgeInterestPayments)
+          .where(
+            and(
+              eq(repledgeInterestPayments.id, paymentId),
+              eq(repledgeInterestPayments.repledgeId, id)
+            )
+          );
+
+        // Recalculate total interest paid
+        const allPayments = await tx
+          .select({ amount: repledgeInterestPayments.amount })
+          .from(repledgeInterestPayments)
+          .where(eq(repledgeInterestPayments.repledgeId, id));
+
+        newTotal = allPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+        await tx
+          .update(repledges)
+          .set({
+            totalInterestPaid: newTotal.toFixed(2),
+            updatedAt: new Date(),
+          })
+          .where(eq(repledges.id, id));
+      });
+
+      return reply.send({
+        success: true,
+        message: 'Interest payment entry deleted successfully',
+        totalInterestPaid: newTotal.toFixed(2),
+      });
+    } catch (err: any) {
+      request.log.error(err);
+      return reply.status(500).send({
+        success: false,
+        error: err.message || 'Failed to delete interest payment entry',
       });
     }
   });

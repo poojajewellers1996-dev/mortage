@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Repledge, Pledge } from "@/types";
+import { Repledge, Pledge, RepledgeInterestPayment } from "@/types";
 import { api } from "@/lib/api";
 import { formatIndianCurrency, formatWeight } from "@/lib/number-to-words";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,11 @@ import {
   Layers,
   Sparkles,
   Pencil,
+  Plus,
+  Receipt,
+  History,
+  CreditCard,
+  Clock,
 } from "lucide-react";
 
 export const PLEDGER_NAMES = [
@@ -1123,6 +1128,12 @@ export function ViewRepledgeModal({ isOpen, repledge, onClose }: ViewRepledgeMod
               <span className="text-slate-400 block">Total Net Weight:</span>
               <span className="font-bold text-amber-900">{formatWeight(repledge.totalNetWeight)}</span>
             </div>
+            <div className="col-span-2 border-t border-slate-200 pt-2">
+              <span className="text-slate-400 block">Total Bank Interest Paid (कुल ब्याज):</span>
+              <span className="font-black text-amber-950 text-sm">
+                {formatIndianCurrency(repledge.totalInterestPaid || 0)}
+              </span>
+            </div>
             {repledge.releasedDate && (
               <div className="col-span-2 border-t border-slate-200 pt-2">
                 <span className="text-slate-400 block">Released Date:</span>
@@ -1258,6 +1269,456 @@ export function DeleteRepledgeModal({
               <span>{isDeleting ? "Deleting..." : "Yes, Delete"}</span>
             </Button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* BANK RE-PLEDGE INTEREST PAYMENT & LEDGER MODAL                             */
+/* -------------------------------------------------------------------------- */
+interface RepledgeInterestModalProps {
+  isOpen: boolean;
+  repledge: Repledge | null;
+  onClose: () => void;
+  onInterestUpdated?: (updatedRepledgeId: string, newTotalInterestPaid: string) => void;
+}
+
+export function RepledgeInterestModal({
+  isOpen,
+  repledge,
+  onClose,
+  onInterestUpdated,
+}: RepledgeInterestModalProps) {
+  const [payments, setPayments] = useState<RepledgeInterestPayment[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
+
+  // Form state
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [amount, setAmount] = useState<string | number>("");
+  const [forMonth, setForMonth] = useState("");
+  const [paymentMode, setPaymentMode] = useState("Online / Bank Transfer");
+  const [referenceNumber, setReferenceNumber] = useState("");
+  const [remarks, setRemarks] = useState("");
+
+  // Month suggestions (current month and previous 3 months)
+  const monthSuggestions = useMemo(() => {
+    const list: string[] = [];
+    const now = new Date();
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      list.push(d.toLocaleString("en-US", { month: "short", year: "numeric" }));
+    }
+    return list;
+  }, []);
+
+  const fetchPayments = async () => {
+    if (!repledge) return;
+    setIsLoading(true);
+    try {
+      const res = await api.getRepledgeInterest(repledge.id);
+      if (res.success && res.data) {
+        setPayments(res.data);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch interest payments:", err);
+      toast.error("Could not load interest payment history.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && repledge) {
+      fetchPayments();
+      const currentMonth = new Date().toLocaleString("en-US", { month: "short", year: "numeric" });
+      setForMonth(currentMonth);
+      setPaymentDate(new Date().toISOString().split("T")[0]);
+      setAmount("");
+      setReferenceNumber("");
+      setRemarks("");
+      setPaymentMode("Online / Bank Transfer");
+    } else {
+      setPayments([]);
+    }
+  }, [isOpen, repledge?.id]);
+
+  if (!isOpen || !repledge) return null;
+
+  const totalCalculated = payments.reduce((sum, p) => sum + (parseFloat(String(p.amount)) || 0), 0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const numAmount = parseFloat(String(amount));
+    if (!numAmount || numAmount <= 0) {
+      toast.error("Please enter a valid interest amount greater than 0");
+      return;
+    }
+    if (!paymentDate) {
+      toast.error("Please select a payment date");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await api.addRepledgeInterest(repledge.id, {
+        paymentDate,
+        amount: numAmount,
+        forMonth: forMonth.trim() || undefined,
+        paymentMode,
+        referenceNumber: referenceNumber.trim() || undefined,
+        remarks: remarks.trim() || undefined,
+      });
+
+      if (res.success) {
+        toast.success(res.message || "Interest payment recorded successfully");
+        setAmount("");
+        setReferenceNumber("");
+        setRemarks("");
+        // Reload payments
+        await fetchPayments();
+        if (onInterestUpdated) {
+          onInterestUpdated(repledge.id, res.totalInterestPaid);
+        }
+      } else {
+        toast.error(res.message || "Failed to record interest payment");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error recording interest payment");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (paymentId: string) => {
+    if (!confirm("Are you sure you want to delete this interest payment record?")) {
+      return;
+    }
+    setDeletingPaymentId(paymentId);
+    try {
+      const res = await api.deleteRepledgeInterest(repledge.id, paymentId);
+      if (res.success) {
+        toast.success("Interest payment deleted successfully");
+        await fetchPayments();
+        if (onInterestUpdated) {
+          onInterestUpdated(repledge.id, res.totalInterestPaid);
+        }
+      } else {
+        toast.error(res.message || "Failed to delete payment entry");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error deleting payment");
+    } finally {
+      setDeletingPaymentId(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-[#0B1326] text-white border-b border-slate-800 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400">
+              <Coins className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold">Bank Monthly Interest Payment Ledger</h3>
+                <span className="text-[10px] font-bold bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                  बैंक ब्याज भुगतान
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {repledge.bankName} • Pledge #{repledge.bankPledgeNumber} • {repledge.pledgerName}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Loan Summary Strip */}
+        <div className="bg-amber-50/70 border-b border-amber-200/80 px-6 py-3 shrink-0 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div>
+            <span className="text-slate-500 block text-[10px] uppercase font-bold">Bank & Loan #</span>
+            <span className="font-bold text-slate-900">{repledge.bankName} - #{repledge.bankPledgeNumber}</span>
+          </div>
+          <div>
+            <span className="text-slate-500 block text-[10px] uppercase font-bold">Loan Principal (मूलधन)</span>
+            <span className="font-extrabold text-emerald-800">{formatIndianCurrency(repledge.bankPledgeAmount)}</span>
+          </div>
+          <div>
+            <span className="text-slate-500 block text-[10px] uppercase font-bold">Pledge Date</span>
+            <span className="font-semibold text-slate-700">{repledge.bankPledgeDate}</span>
+          </div>
+          <div>
+            <span className="text-amber-900 block text-[10px] uppercase font-bold">Total Interest Paid So Far</span>
+            <span className="font-black text-amber-950 text-sm">{formatIndianCurrency(totalCalculated)}</span>
+          </div>
+        </div>
+
+        {/* Scrollable Content Body */}
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
+          {/* Section 1: Record New Payment Form */}
+          <div className="bg-slate-50/80 rounded-xl p-4 sm:p-5 border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-amber-600" />
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wide">
+                  Record Monthly Interest Payment (ब्याज भुगतान दर्ज करें)
+                </h4>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">Monthly bank interest tracking</span>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Payment Date */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-slate-700">Payment Date (तारीख) *</Label>
+                  <Input
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    required
+                    className="h-9 text-xs bg-white"
+                  />
+                </div>
+
+                {/* Amount Paid */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-slate-700">Interest Amount (₹ ब्याज) *</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">₹</span>
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0.01"
+                      placeholder="e.g. 3500"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      required
+                      className="pl-7 h-9 text-xs font-bold bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* For Month / Period */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-slate-700">For Month / Period (किस महीने का)</Label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Nov 2026"
+                    value={forMonth}
+                    onChange={(e) => setForMonth(e.target.value)}
+                    className="h-9 text-xs bg-white"
+                  />
+                  {/* Quick Month Pills */}
+                  <div className="flex flex-wrap items-center gap-1 pt-1">
+                    <span className="text-[10px] text-slate-400 mr-0.5">Quick:</span>
+                    {monthSuggestions.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setForMonth(m)}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                          forMonth === m
+                            ? "bg-amber-100 text-amber-900 border-amber-300 font-bold"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Payment Mode */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-slate-700">Payment Mode (माध्यम)</Label>
+                  <select
+                    value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value)}
+                    className="w-full h-9 px-3 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-800"
+                  >
+                    <option value="Online / Bank Transfer">Online / Bank Transfer (NEFT/RTGS)</option>
+                    <option value="UPI / QR">UPI / QR (GPay / PhonePe)</option>
+                    <option value="Cash">Cash (नकद)</option>
+                    <option value="Cheque">Cheque (चेक)</option>
+                  </select>
+                </div>
+
+                {/* Ref / UTR # */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-slate-700">Bank UTR / Ref / Receipt #</Label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. UTR12849202, Rec# 994"
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    className="h-9 text-xs bg-white"
+                  />
+                </div>
+
+                {/* Remarks */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-slate-700">Remarks / Notes</Label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Paid via Kosamattam App"
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    className="h-9 text-xs bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-9 px-4 gap-1.5 shadow-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>{isSubmitting ? "Recording Entry..." : "Save Interest Payment (ब्याज दर्ज करें)"}</span>
+                </Button>
+              </div>
+            </form>
+          </div>
+
+          {/* Section 2: Interest Payment Ledger History */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-slate-700" />
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wide">
+                  Interest Payment History ({payments.length} entries)
+                </h4>
+              </div>
+              <span className="text-xs font-mono font-bold text-amber-950">
+                Total: {formatIndianCurrency(totalCalculated)}
+              </span>
+            </div>
+
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-700 border-b border-slate-200 text-[11px]">
+                    <th className="py-2.5 px-3 w-10 text-center font-bold">#</th>
+                    <th className="py-2.5 px-3 font-bold">Payment Date</th>
+                    <th className="py-2.5 px-3 font-bold">For Month</th>
+                    <th className="py-2.5 px-3 font-bold text-right">Amount (₹)</th>
+                    <th className="py-2.5 px-3 font-bold">Mode</th>
+                    <th className="py-2.5 px-3 font-bold">Ref / UTR #</th>
+                    <th className="py-2.5 px-3 font-bold">Remarks</th>
+                    <th className="py-2.5 px-3 w-12 text-center font-bold">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
+                          <span>Loading interest history...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : payments.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        <Coins className="h-6 w-6 mx-auto mb-1.5 text-slate-300" />
+                        <p className="font-semibold text-slate-600 text-xs">No interest payments recorded yet</p>
+                        <p className="text-[11px] text-slate-400">
+                          Use the form above to record your first monthly bank interest payment.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    payments.map((p, idx) => (
+                      <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-medium text-slate-800">
+                          {p.paymentDate}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {p.forMonth ? (
+                            <span className="font-semibold text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px]">
+                              {p.forMonth}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">-</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-800 text-xs sm:text-sm">
+                          {formatIndianCurrency(p.amount)}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700 font-medium">
+                          {p.paymentMode}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-slate-600 text-[11px]">
+                          {p.referenceNumber || "-"}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 italic text-[11px]">
+                          {p.remarks || "-"}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <button
+                            type="button"
+                            disabled={deletingPaymentId === p.id}
+                            onClick={() => handleDelete(p.id)}
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Delete Payment Entry"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {payments.length > 0 && (
+                  <tfoot>
+                    <tr className="bg-amber-50/80 font-bold border-t-2 border-amber-200 text-slate-900">
+                      <td colSpan={3} className="py-2.5 px-3 text-right uppercase tracking-wider text-[11px]">
+                        Total Interest Paid (कुल ब्याज भुगतान):
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-amber-950 text-sm">
+                        {formatIndianCurrency(totalCalculated)}
+                      </td>
+                      <td colSpan={4} className="py-2.5 px-3 text-slate-500 font-normal text-[11px]">
+                        Across {payments.length} monthly installments
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div className="flex items-center justify-between px-6 py-3 bg-slate-50 border-t border-slate-200 shrink-0">
+          <div className="text-xs text-slate-500">
+            Total Interest Recorded: <span className="font-bold text-amber-950">{formatIndianCurrency(totalCalculated)}</span>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            Close
+          </Button>
         </div>
       </div>
     </div>

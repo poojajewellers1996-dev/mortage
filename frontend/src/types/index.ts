@@ -145,10 +145,25 @@ export interface Repledge {
   totalPledgesCount: number;
   totalGrossWeight: string;
   totalNetWeight: string;
+  totalInterestPaid?: string | number;
   linkedPledgeNumbers: string[];
   linkedPledges?: LinkedPledgeItem[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface RepledgeInterestPayment {
+  id: string;
+  repledgeId: string;
+  paymentDate: string;
+  amount: string | number;
+  forMonth?: string | null;
+  paymentMode: string;
+  referenceNumber?: string | null;
+  remarks?: string | null;
+  paidBy?: string | null;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface DashboardSummary {

@@ -260,4 +260,31 @@ export const api = {
     apiFetch<{ success: boolean; message: string }>(`/api/repledges/${id}`, {
       method: "DELETE",
     }),
+  getRepledgeInterest: (id: string) =>
+    apiFetch<{ success: boolean; data: any[]; totalInterestPaid: string }>(`/api/repledges/${id}/interest`),
+  addRepledgeInterest: (
+    id: string,
+    data: {
+      paymentDate: string;
+      amount: number;
+      forMonth?: string;
+      paymentMode: string;
+      referenceNumber?: string;
+      remarks?: string;
+    }
+  ) =>
+    apiFetch<{ success: boolean; data: any; totalInterestPaid: string; message: string }>(
+      `/api/repledges/${id}/interest`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    ),
+  deleteRepledgeInterest: (id: string, paymentId: string) =>
+    apiFetch<{ success: boolean; totalInterestPaid: string; message: string }>(
+      `/api/repledges/${id}/interest/${paymentId}`,
+      {
+        method: "DELETE",
+      }
+    ),
 };

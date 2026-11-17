@@ -174,6 +174,7 @@ export const repledges = pgTable('repledges', {
   totalPledgesCount: integer('total_pledges_count').notNull().default(0),
   totalGrossWeight: numeric('total_gross_weight', { precision: 10, scale: 3 }).default('0.000'),
   totalNetWeight: numeric('total_net_weight', { precision: 10, scale: 3 }).default('0.000'),
+  totalInterestPaid: numeric('total_interest_paid', { precision: 14, scale: 2 }).notNull().default('0.00'),
   linkedPledgeNumbers: jsonb('linked_pledge_numbers').$type<string[]>().default([]),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -186,6 +187,20 @@ export const repledgePledges = pgTable('repledge_pledges', {
   pledgeId: uuid('pledge_id').notNull().references(() => pledges.id, { onDelete: 'cascade' }),
   pledgeNumber: varchar('pledge_number', { length: 50 }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const repledgeInterestPayments = pgTable('repledge_interest_payments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  repledgeId: uuid('repledge_id').notNull().references(() => repledges.id, { onDelete: 'cascade' }),
+  paymentDate: date('payment_date').notNull().defaultNow(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  forMonth: varchar('for_month', { length: 100 }),
+  paymentMode: varchar('payment_mode', { length: 50 }).notNull().default('Online / Bank Transfer'),
+  referenceNumber: varchar('reference_number', { length: 100 }),
+  remarks: text('remarks'),
+  paidBy: uuid('paid_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ============================================================================

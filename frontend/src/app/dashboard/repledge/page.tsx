@@ -12,6 +12,7 @@ import {
   ReleaseRepledgeModal,
   ViewRepledgeModal,
   DeleteRepledgeModal,
+  RepledgeInterestModal,
   BANK_NAMES,
   PLEDGER_NAMES,
 } from "@/components/repledge/RepledgeModals";
@@ -38,9 +39,10 @@ import {
   Sparkles,
   ExternalLink,
   Pencil,
+  Receipt,
 } from "lucide-react";
 
-type SortField = "bankPledgeNumber" | "bankName" | "pledgerName" | "bankPledgeDate" | "weight" | "amount";
+type SortField = "bankPledgeNumber" | "bankName" | "pledgerName" | "bankPledgeDate" | "weight" | "amount" | "interestPaid";
 type SortDirection = "asc" | "desc";
 
 function ActiveRepledgePageInner() {
@@ -63,6 +65,7 @@ function ActiveRepledgePageInner() {
   const [releaseModalRepledge, setReleaseModalRepledge] = useState<Repledge | null>(null);
   const [viewModalRepledge, setViewModalRepledge] = useState<Repledge | null>(null);
   const [deleteModalRepledge, setDeleteModalRepledge] = useState<Repledge | null>(null);
+  const [interestModalRepledge, setInterestModalRepledge] = useState<Repledge | null>(null);
 
   const fetchRepledges = () => {
     setIsLoading(true);
@@ -130,6 +133,11 @@ function ActiveRepledgePageInner() {
           comparison =
             (parseFloat(String(a.bankPledgeAmount)) || 0) - (parseFloat(String(b.bankPledgeAmount)) || 0);
           break;
+        case "interestPaid":
+          comparison =
+            (parseFloat(String(a.totalInterestPaid || 0)) || 0) -
+            (parseFloat(String(b.totalInterestPaid || 0)) || 0);
+          break;
       }
       return sortDirection === "asc" ? comparison : -comparison;
     });
@@ -138,6 +146,10 @@ function ActiveRepledgePageInner() {
   // Summary Metrics
   const totalBankLoanAmount = useMemo(() => {
     return repledges.reduce((sum, r) => sum + (parseFloat(String(r.bankPledgeAmount)) || 0), 0);
+  }, [repledges]);
+
+  const totalBankInterestPaid = useMemo(() => {
+    return repledges.reduce((sum, r) => sum + (parseFloat(String(r.totalInterestPaid || 0)) || 0), 0);
   }, [repledges]);
 
   const totalBankNetWeight = useMemo(() => {
@@ -153,7 +165,11 @@ function ActiveRepledgePageInner() {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      setSortDirection(field === "amount" || field === "weight" || field === "bankPledgeDate" ? "desc" : "asc");
+      setSortDirection(
+        field === "amount" || field === "interestPaid" || field === "weight" || field === "bankPledgeDate"
+          ? "desc"
+          : "asc"
+      );
     }
   };
 
@@ -223,7 +239,7 @@ function ActiveRepledgePageInner() {
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
         {/* Total Bank Loan */}
         <Card className="border-amber-200 bg-gradient-to-br from-white to-amber-50/40 shadow-sm">
           <CardContent className="p-4 space-y-1">
@@ -238,6 +254,20 @@ function ActiveRepledgePageInner() {
           </CardContent>
         </Card>
 
+        {/* Total Bank Interest Paid */}
+        <Card className="border-amber-200 bg-amber-50/50 shadow-sm">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-slate-500">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">Total Interest Paid</span>
+              <Receipt className="h-4 w-4 text-amber-600" />
+            </div>
+            <p className="text-lg sm:text-xl font-black text-amber-950">
+              {formatIndianCurrency(totalBankInterestPaid)}
+            </p>
+            <p className="text-[10px] text-slate-500 font-medium">Monthly bank interest paid</p>
+          </CardContent>
+        </Card>
+
         {/* Total Net Weight in Bank */}
         <Card className="border-slate-200 bg-white shadow-sm">
           <CardContent className="p-4 space-y-1">
@@ -246,7 +276,7 @@ function ActiveRepledgePageInner() {
               <Scale className="h-4 w-4 text-slate-600" />
             </div>
             <p className="text-lg sm:text-xl font-bold text-slate-800">{totalBankNetWeight} g</p>
-            <p className="text-[10px] text-slate-500 font-medium">Ornaments locked in bank vaults</p>
+            <p className="text-[10px] text-slate-500 font-medium">Ornaments locked in vaults</p>
           </CardContent>
         </Card>
 
@@ -258,7 +288,7 @@ function ActiveRepledgePageInner() {
               <Landmark className="h-4 w-4 text-slate-600" />
             </div>
             <p className="text-lg sm:text-xl font-bold text-slate-800">{repledges.length} Loans</p>
-            <p className="text-[10px] text-slate-500 font-medium">Across commercial banks & NBFCs</p>
+            <p className="text-[10px] text-slate-500 font-medium">Across banks & NBFCs</p>
           </CardContent>
         </Card>
 
@@ -338,7 +368,8 @@ function ActiveRepledgePageInner() {
                   </th>
                   <th className="py-3 px-3 text-right">{renderSortableHeader("weight", "Net Wt", "right")}</th>
                   <th className="py-3 px-3 text-right">{renderSortableHeader("amount", "Bank Loan (₹)", "right")}</th>
-                  <th className="py-3 px-3 text-center w-28">
+                  <th className="py-3 px-3 text-right">{renderSortableHeader("interestPaid", "Interest Paid (₹)", "right")}</th>
+                  <th className="py-3 px-3 text-center w-36">
                     <span className="font-bold uppercase text-slate-600">Actions</span>
                   </th>
                 </tr>
@@ -346,7 +377,7 @@ function ActiveRepledgePageInner() {
               <tbody className="divide-y divide-slate-100 bg-white">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-400">
+                    <td colSpan={10} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center gap-2">
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
                         <span>Loading active bank re-pledges...</span>
@@ -355,7 +386,7 @@ function ActiveRepledgePageInner() {
                   </tr>
                 ) : sortedRepledges.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-400">
+                    <td colSpan={10} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center gap-1.5">
                         <Landmark className="h-8 w-8 text-slate-300" />
                         <span className="font-semibold text-slate-600">No active bank re-pledges found</span>
@@ -425,9 +456,40 @@ function ActiveRepledgePageInner() {
                         {formatIndianCurrency(r.bankPledgeAmount)}
                       </td>
 
+                      {/* Interest Paid */}
+                      <td className="py-2.5 px-3 text-right">
+                        <div className="flex flex-col items-end">
+                          <span className="font-mono font-bold text-amber-950">
+                            {formatIndianCurrency(r.totalInterestPaid || 0)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setInterestModalRepledge(r)}
+                            className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
+                            title="Open Interest Payment Ledger"
+                          >
+                            <Receipt className="h-2.5 w-2.5" />
+                            <span>Ledger</span>
+                          </button>
+                        </div>
+                      </td>
+
                       {/* Actions */}
                       <td className="py-2.5 px-3 text-center">
                         <div className="inline-flex items-center gap-1">
+                          {/* Interest Button */}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setInterestModalRepledge(r)}
+                            className="h-7 px-2 text-[11px] font-bold text-amber-800 border-amber-300 hover:bg-amber-50 gap-0.5"
+                            title="Pay / Record Monthly Bank Interest"
+                          >
+                            <Coins className="h-3 w-3 text-amber-600" />
+                            <span>Interest</span>
+                          </Button>
+
                           {/* Release Button */}
                           <Button
                             type="button"
@@ -525,6 +587,22 @@ function ActiveRepledgePageInner() {
         onClose={() => setDeleteModalRepledge(null)}
         onSuccess={(deletedId) => {
           setRepledges((prev) => prev.filter((r) => r.id !== deletedId));
+        }}
+      />
+
+      <RepledgeInterestModal
+        isOpen={!!interestModalRepledge}
+        repledge={interestModalRepledge}
+        onClose={() => setInterestModalRepledge(null)}
+        onInterestUpdated={(updatedId, newTotal) => {
+          setRepledges((prev) =>
+            prev.map((r) => (r.id === updatedId ? { ...r, totalInterestPaid: newTotal } : r))
+          );
+          if (interestModalRepledge && interestModalRepledge.id === updatedId) {
+            setInterestModalRepledge((prev) =>
+              prev ? { ...prev, totalInterestPaid: newTotal } : null
+            );
+          }
         }}
       />
     </div>

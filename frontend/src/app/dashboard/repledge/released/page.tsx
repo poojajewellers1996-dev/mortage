@@ -8,6 +8,7 @@ import { formatIndianCurrency, formatWeight } from "@/lib/number-to-words";
 import {
   ViewRepledgeModal,
   DeleteRepledgeModal,
+  RepledgeInterestModal,
   BANK_NAMES,
   PLEDGER_NAMES,
 } from "@/components/repledge/RepledgeModals";
@@ -31,9 +32,10 @@ import {
   Trash2,
   Landmark,
   ArrowLeft,
+  Receipt,
 } from "lucide-react";
 
-type SortField = "bankPledgeNumber" | "bankName" | "pledgerName" | "bankPledgeDate" | "releasedDate" | "weight" | "amount";
+type SortField = "bankPledgeNumber" | "bankName" | "pledgerName" | "bankPledgeDate" | "releasedDate" | "weight" | "amount" | "interestPaid";
 type SortDirection = "asc" | "desc";
 
 function ReleasedRepledgePageInner() {
@@ -52,6 +54,7 @@ function ReleasedRepledgePageInner() {
   // Modals state
   const [viewModalRepledge, setViewModalRepledge] = useState<Repledge | null>(null);
   const [deleteModalRepledge, setDeleteModalRepledge] = useState<Repledge | null>(null);
+  const [interestModalRepledge, setInterestModalRepledge] = useState<Repledge | null>(null);
 
   const fetchReleasedRepledges = () => {
     setIsLoading(true);
@@ -123,6 +126,11 @@ function ReleasedRepledgePageInner() {
           comparison =
             (parseFloat(String(a.bankPledgeAmount)) || 0) - (parseFloat(String(b.bankPledgeAmount)) || 0);
           break;
+        case "interestPaid":
+          comparison =
+            (parseFloat(String(a.totalInterestPaid || 0)) || 0) -
+            (parseFloat(String(b.totalInterestPaid || 0)) || 0);
+          break;
       }
       return sortDirection === "asc" ? comparison : -comparison;
     });
@@ -131,6 +139,10 @@ function ReleasedRepledgePageInner() {
   // Metrics
   const totalSettledAmount = useMemo(() => {
     return repledges.reduce((sum, r) => sum + (parseFloat(String(r.bankPledgeAmount)) || 0), 0);
+  }, [repledges]);
+
+  const totalSettledInterestPaid = useMemo(() => {
+    return repledges.reduce((sum, r) => sum + (parseFloat(String(r.totalInterestPaid || 0)) || 0), 0);
   }, [repledges]);
 
   const totalRedeemedWeight = useMemo(() => {
@@ -146,7 +158,11 @@ function ReleasedRepledgePageInner() {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      setSortDirection(field === "amount" || field === "weight" || field === "releasedDate" ? "desc" : "asc");
+      setSortDirection(
+        field === "amount" || field === "interestPaid" || field === "weight" || field === "releasedDate"
+          ? "desc"
+          : "asc"
+      );
     }
   };
 
@@ -205,7 +221,7 @@ function ReleasedRepledgePageInner() {
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
         {/* Total Settled */}
         <Card className="border-emerald-200 bg-gradient-to-br from-white to-emerald-50/40 shadow-sm">
           <CardContent className="p-4 space-y-1">
@@ -217,6 +233,20 @@ function ReleasedRepledgePageInner() {
               {formatIndianCurrency(totalSettledAmount)}
             </p>
             <p className="text-[10px] text-slate-500 font-medium">Total bank capital redeemed</p>
+          </CardContent>
+        </Card>
+
+        {/* Total Interest Paid */}
+        <Card className="border-emerald-200 bg-emerald-50/40 shadow-sm">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-slate-500">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-900">Total Interest Paid</span>
+              <Receipt className="h-4 w-4 text-emerald-600" />
+            </div>
+            <p className="text-lg sm:text-xl font-black text-emerald-950">
+              {formatIndianCurrency(totalSettledInterestPaid)}
+            </p>
+            <p className="text-[10px] text-slate-500 font-medium">Paid across released loans</p>
           </CardContent>
         </Card>
 
@@ -321,10 +351,11 @@ function ReleasedRepledgePageInner() {
                   </th>
                   <th className="py-3 px-3 text-right">{renderSortableHeader("weight", "Net Wt", "right")}</th>
                   <th className="py-3 px-3 text-right">{renderSortableHeader("amount", "Bank Loan (₹)", "right")}</th>
+                  <th className="py-3 px-3 text-right">{renderSortableHeader("interestPaid", "Interest Paid (₹)", "right")}</th>
                   <th className="py-3 px-3">
                     <span className="font-bold uppercase text-slate-600">Release Remarks</span>
                   </th>
-                  <th className="py-3 px-3 text-center w-20">
+                  <th className="py-3 px-3 text-center w-28">
                     <span className="font-bold uppercase text-slate-600">Actions</span>
                   </th>
                 </tr>
@@ -332,7 +363,7 @@ function ReleasedRepledgePageInner() {
               <tbody className="divide-y divide-slate-100 bg-white">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={11} className="py-12 text-center text-slate-400">
+                    <td colSpan={12} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center gap-2">
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
                         <span>Loading released bank re-pledges...</span>
@@ -341,7 +372,7 @@ function ReleasedRepledgePageInner() {
                   </tr>
                 ) : sortedRepledges.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-12 text-center text-slate-400">
+                    <td colSpan={12} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center gap-1.5">
                         <CheckCircle2 className="h-8 w-8 text-slate-300" />
                         <span className="font-semibold text-slate-600">No released bank re-pledges yet</span>
@@ -413,6 +444,24 @@ function ReleasedRepledgePageInner() {
                         {formatIndianCurrency(r.bankPledgeAmount)}
                       </td>
 
+                      {/* Interest Paid */}
+                      <td className="py-2.5 px-3 text-right">
+                        <div className="flex flex-col items-end">
+                          <span className="font-mono font-bold text-slate-900">
+                            {formatIndianCurrency(r.totalInterestPaid || 0)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setInterestModalRepledge(r)}
+                            className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
+                            title="View Interest Ledger"
+                          >
+                            <Receipt className="h-2.5 w-2.5" />
+                            <span>Ledger</span>
+                          </button>
+                        </div>
+                      </td>
+
                       {/* Release Remarks */}
                       <td className="py-2.5 px-3 text-slate-600 italic text-[11px]">
                         {r.releaseRemarks || "—"}
@@ -421,6 +470,16 @@ function ReleasedRepledgePageInner() {
                       {/* Actions */}
                       <td className="py-2.5 px-3 text-center">
                         <div className="inline-flex items-center gap-1">
+                          {/* Interest Button */}
+                          <button
+                            type="button"
+                            onClick={() => setInterestModalRepledge(r)}
+                            className="p-1 rounded text-slate-500 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                            title="View Interest Payment History"
+                          >
+                            <Coins className="h-3.5 w-3.5 text-amber-600" />
+                          </button>
+
                           {/* View Button */}
                           <button
                             type="button"
@@ -464,6 +523,22 @@ function ReleasedRepledgePageInner() {
         onClose={() => setDeleteModalRepledge(null)}
         onSuccess={(deletedId) => {
           setRepledges((prev) => prev.filter((r) => r.id !== deletedId));
+        }}
+      />
+
+      <RepledgeInterestModal
+        isOpen={!!interestModalRepledge}
+        repledge={interestModalRepledge}
+        onClose={() => setInterestModalRepledge(null)}
+        onInterestUpdated={(updatedId, newTotal) => {
+          setRepledges((prev) =>
+            prev.map((r) => (r.id === updatedId ? { ...r, totalInterestPaid: newTotal } : r))
+          );
+          if (interestModalRepledge && interestModalRepledge.id === updatedId) {
+            setInterestModalRepledge((prev) =>
+              prev ? { ...prev, totalInterestPaid: newTotal } : null
+            );
+          }
         }}
       />
     </div>
