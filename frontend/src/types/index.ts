@@ -146,6 +146,13 @@ export interface Repledge {
   totalGrossWeight: string;
   totalNetWeight: string;
   totalInterestPaid?: string | number;
+  latestInterestPayment?: {
+    paymentDate: string;
+    amount: string | number;
+    forMonth?: string | null;
+    isCurrentMonthPaid?: boolean;
+  } | null;
+  isCurrentMonthPaid?: boolean;
   linkedPledgeNumbers: string[];
   linkedPledges?: LinkedPledgeItem[];
   createdAt: string;

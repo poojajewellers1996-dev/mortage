@@ -74,7 +74,17 @@ function LoginForm() {
             <Shield className="h-4 w-4 text-sky-700 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block">Session Expired</span>
-              <span>Your previous work session has expired. Daily re-authentication is required.</span>
+              <span>Your previous work session has expired. Re-authentication is required.</span>
+            </div>
+          </div>
+        )}
+
+        {reason === "daily_expiry" && (
+          <div className="flex items-start gap-2.5 p-3 text-xs rounded-xl bg-amber-50 text-amber-900 border border-amber-300">
+            <ShieldCheck className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block">Daily Security Reset</span>
+              <span>Sessions automatically close overnight for vault security. Please sign in for today&apos;s workday.</span>
             </div>
           </div>
         )}

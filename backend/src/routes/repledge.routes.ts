@@ -135,9 +135,41 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
         }
       }
 
+      // Fetch latest interest info for each repledge to determine monthly status
+      let latestInterestMap: Record<string, any> = {};
+      const currentMonthShort = new Date().toLocaleString('en-US', { month: 'short' }).toLowerCase();
+      const currentYear = new Date().getFullYear();
+
+      if (repledgeIds.length > 0) {
+        const allInterests = await db
+          .select()
+          .from(repledgeInterestPayments)
+          .where(inArray(repledgeInterestPayments.repledgeId, repledgeIds))
+          .orderBy(desc(repledgeInterestPayments.paymentDate), desc(repledgeInterestPayments.createdAt));
+
+        for (const item of allInterests) {
+          if (!latestInterestMap[item.repledgeId]) {
+            const monthStr = (item.forMonth || '').toLowerCase();
+            const payYear = new Date(item.paymentDate).getFullYear();
+            const isCurrentMonth =
+              monthStr.includes(currentMonthShort) &&
+              (monthStr.includes(String(currentYear)) || payYear === currentYear);
+
+            latestInterestMap[item.repledgeId] = {
+              paymentDate: item.paymentDate,
+              amount: item.amount,
+              forMonth: item.forMonth,
+              isCurrentMonthPaid: isCurrentMonth,
+            };
+          }
+        }
+      }
+
       const enriched = records.map(r => ({
         ...r,
         linkedPledges: linkedMap[r.id] || [],
+        latestInterestPayment: latestInterestMap[r.id] || null,
+        isCurrentMonthPaid: Boolean(latestInterestMap[r.id]?.isCurrentMonthPaid),
       }));
 
       return reply.send({
@@ -943,6 +975,115 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({
         success: false,
         error: err.message || 'Failed to record interest payment',
+      });
+    }
+  });
+
+  // PUT /api/repledges/:id/interest/:paymentId - Edit an existing interest payment entry
+  fastify.put('/:id/interest/:paymentId', async (request, reply) => {
+    const { id, paymentId } = request.params as { id: string; paymentId: string };
+    const parse = addRepledgeInterestSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Validation failed',
+        details: parse.error.format(),
+      });
+    }
+
+    const { paymentDate, amount, forMonth, paymentMode, referenceNumber, remarks } = parse.data;
+
+    try {
+      const existing = await db.select().from(repledges).where(eq(repledges.id, id)).limit(1);
+      if (existing.length === 0) {
+        return reply.status(404).send({ success: false, error: 'Re-pledge record not found' });
+      }
+
+      const paymentRecord = await db
+        .select()
+        .from(repledgeInterestPayments)
+        .where(
+          and(
+            eq(repledgeInterestPayments.id, paymentId),
+            eq(repledgeInterestPayments.repledgeId, id)
+          )
+        )
+        .limit(1);
+
+      if (paymentRecord.length === 0) {
+        return reply.status(404).send({ success: false, error: 'Interest payment entry not found' });
+      }
+
+      let updatedPayment: any;
+      let newTotal = 0;
+
+      await db.transaction(async tx => {
+        const [updated] = await tx
+          .update(repledgeInterestPayments)
+          .set({
+            paymentDate,
+            amount: amount.toFixed(2),
+            forMonth: forMonth ? forMonth.trim() : null,
+            paymentMode,
+            referenceNumber: referenceNumber ? referenceNumber.trim() : null,
+            remarks: remarks ? remarks.trim() : null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(repledgeInterestPayments.id, paymentId),
+              eq(repledgeInterestPayments.repledgeId, id)
+            )
+          )
+          .returning();
+        updatedPayment = updated;
+
+        // Recalculate total interest paid
+        const allPayments = await tx
+          .select({ amount: repledgeInterestPayments.amount })
+          .from(repledgeInterestPayments)
+          .where(eq(repledgeInterestPayments.repledgeId, id));
+
+        newTotal = allPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+        await tx
+          .update(repledges)
+          .set({
+            totalInterestPaid: newTotal.toFixed(2),
+            updatedAt: new Date(),
+          })
+          .where(eq(repledges.id, id));
+      });
+
+      const user = (request as any).user;
+      await AuditService.log({
+        userId: user?.id,
+        action: 'EDIT_REPLEDGE_INTEREST',
+        entityName: 'repledge_interest_payments',
+        entityId: paymentId,
+        details: {
+          repledgeId: id,
+          bankPledgeNumber: existing[0].bankPledgeNumber,
+          bankName: existing[0].bankName,
+          amount,
+          paymentDate,
+          forMonth,
+          paymentMode,
+          totalInterestPaidNow: newTotal.toFixed(2),
+        },
+      });
+
+      return reply.send({
+        success: true,
+        message: 'Interest payment entry updated successfully',
+        data: updatedPayment,
+        totalInterestPaid: newTotal.toFixed(2),
+      });
+    } catch (err: any) {
+      request.log.error(err);
+      return reply.status(500).send({
+        success: false,
+        error: err.message || 'Failed to update interest payment entry',
       });
     }
   });

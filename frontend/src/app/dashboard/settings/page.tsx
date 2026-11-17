@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Save, Shield, Building, FileText } from "lucide-react";
+import { Settings, Save, Shield, Building, FileText, KeyRound, Lock, CheckCircle2 } from "lucide-react";
 
 export default function SettingsPage() {
   const { isAdmin } = useAuth();
@@ -33,6 +33,45 @@ export default function SettingsPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword) {
+      toast.error("Please enter your current password");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("New password must be at least 6 characters long");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("New password and confirmation do not match");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await api.changePassword({ currentPassword, newPassword, confirmPassword });
+      if (res.success) {
+        toast.success(res.message || "Password updated successfully!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        toast.error(res.message || "Failed to change password");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error changing password");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   useEffect(() => {
     api
@@ -251,6 +290,74 @@ export default function SettingsPage() {
           </div>
         )}
       </form>
+
+      {/* Account Security & Password */}
+      <Card className="rounded-xl border-slate-200/90 shadow-sm overflow-hidden">
+        <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/60">
+          <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-900">
+            <KeyRound className="h-4 w-4 text-amber-600" />
+            Account Security & Master Password (पासवर्ड बदलें)
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Update your account password. Daily session limits and activity timeouts protect your vault automatically.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Current Password (वर्तमान पासवर्ड) *</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  type="password"
+                  placeholder="Enter existing password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  className="pl-9 h-9 text-xs bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">New Password (नया पासवर्ड) *</Label>
+                <Input
+                  type="password"
+                  placeholder="At least 6 chars"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  className="h-9 text-xs bg-white"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Confirm New Password *</Label>
+                <Input
+                  type="password"
+                  placeholder="Re-enter new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="h-9 text-xs bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="pt-1">
+              <Button
+                type="submit"
+                disabled={isChangingPassword}
+                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs h-9 px-4 gap-1.5 shadow-sm"
+              >
+                <KeyRound className="h-3.5 w-3.5 text-amber-400" />
+                <span>{isChangingPassword ? "Updating Password..." : "Update Password"}</span>
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

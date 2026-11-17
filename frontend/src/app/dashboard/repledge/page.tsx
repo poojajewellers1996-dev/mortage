@@ -40,6 +40,8 @@ import {
   ExternalLink,
   Pencil,
   Receipt,
+  Printer,
+  AlertCircle,
 } from "lucide-react";
 
 type SortField = "bankPledgeNumber" | "bankName" | "pledgerName" | "bankPledgeDate" | "weight" | "amount" | "interestPaid";
@@ -54,6 +56,10 @@ function ActiveRepledgePageInner() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBank, setSelectedBank] = useState("all");
   const [selectedPledger, setSelectedPledger] = useState("all");
+  const [interestFilter, setInterestFilter] = useState<"all" | "due" | "paid">("all");
+
+  const currentMonthName = useMemo(() => new Date().toLocaleString("en-US", { month: "short" }), []);
+  const dueCount = useMemo(() => repledges.filter((r) => !r.isCurrentMonthPaid).length, [repledges]);
 
   // Sorting
   const [sortField, setSortField] = useState<SortField>("bankPledgeDate");
@@ -92,6 +98,8 @@ function ActiveRepledgePageInner() {
     return repledges.filter((r) => {
       if (selectedBank !== "all" && r.bankName !== selectedBank) return false;
       if (selectedPledger !== "all" && r.pledgerName !== selectedPledger) return false;
+      if (interestFilter === "due" && r.isCurrentMonthPaid) return false;
+      if (interestFilter === "paid" && !r.isCurrentMonthPaid) return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
@@ -105,7 +113,7 @@ function ActiveRepledgePageInner() {
       }
       return true;
     });
-  }, [repledges, selectedBank, selectedPledger, searchQuery]);
+  }, [repledges, selectedBank, selectedPledger, interestFilter, searchQuery]);
 
   // Client-side Sorting
   const sortedRepledges = useMemo(() => {
@@ -228,6 +236,18 @@ function ActiveRepledgePageInner() {
           </Link>
 
           <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => window.print()}
+            className="gap-1.5 text-xs text-slate-700 font-semibold border-slate-300 hover:bg-slate-50"
+            title="Print Bank Re-Pledge Ledger Statement"
+          >
+            <Printer className="h-3.5 w-3.5 text-slate-600" />
+            <span>Print Ledger</span>
+          </Button>
+
+          <Button
             size="sm"
             onClick={() => setIsNewModalOpen(true)}
             className="gap-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-sm"
@@ -347,6 +367,47 @@ function ActiveRepledgePageInner() {
                 </option>
               ))}
             </select>
+
+            {/* Interest Status Filter */}
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setInterestFilter("all")}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                  interestFilter === "all"
+                    ? "bg-white text-slate-900 shadow-sm font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setInterestFilter("due")}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                  interestFilter === "due"
+                    ? "bg-amber-600 text-white font-bold shadow-sm"
+                    : "text-amber-800 hover:text-amber-950"
+                }`}
+                title="Active bank loans with interest due this month"
+              >
+                <AlertCircle className="h-3 w-3" />
+                <span>Due ({dueCount})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInterestFilter("paid")}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                  interestFilter === "paid"
+                    ? "bg-emerald-600 text-white font-bold shadow-sm"
+                    : "text-emerald-800 hover:text-emerald-950"
+                }`}
+                title="Active bank loans with interest already paid this month"
+              >
+                <CheckCircle2 className="h-3 w-3" />
+                <span>Paid ({repledges.length - dueCount})</span>
+              </button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -458,19 +519,38 @@ function ActiveRepledgePageInner() {
 
                       {/* Interest Paid */}
                       <td className="py-2.5 px-3 text-right">
-                        <div className="flex flex-col items-end">
+                        <div className="flex flex-col items-end gap-0.5">
                           <span className="font-mono font-bold text-amber-950">
                             {formatIndianCurrency(r.totalInterestPaid || 0)}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setInterestModalRepledge(r)}
-                            className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
-                            title="Open Interest Payment Ledger"
-                          >
-                            <Receipt className="h-2.5 w-2.5" />
-                            <span>Ledger</span>
-                          </button>
+                          <div className="flex items-center gap-1">
+                            {r.isCurrentMonthPaid ? (
+                              <span
+                                className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded"
+                                title={`Interest for ${currentMonthName} has been paid`}
+                              >
+                                <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" />
+                                <span>{currentMonthName} Paid</span>
+                              </span>
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-900 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded"
+                                title={`Interest for ${currentMonthName} is pending`}
+                              >
+                                <AlertCircle className="h-2.5 w-2.5 text-amber-700" />
+                                <span>{currentMonthName} Due</span>
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setInterestModalRepledge(r)}
+                              className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer ml-1"
+                              title="Open Interest Payment Ledger"
+                            >
+                              <Receipt className="h-2.5 w-2.5" />
+                              <span>Ledger</span>
+                            </button>
+                          </div>
                         </div>
                       </td>
 

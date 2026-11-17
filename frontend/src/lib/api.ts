@@ -27,10 +27,12 @@ export function clearStoredAuth() {
   sessionStorage.removeItem("girvi_user");
   sessionStorage.removeItem("girvi_session_expires_at");
   sessionStorage.removeItem("girvi_last_active");
+  sessionStorage.removeItem("girvi_login_date");
   localStorage.removeItem("girvi_token");
   localStorage.removeItem("girvi_user");
   localStorage.removeItem("girvi_session_expires_at");
   localStorage.removeItem("girvi_last_active");
+  localStorage.removeItem("girvi_login_date");
   localStorage.removeItem("girvi_remember_me");
 }
 
@@ -54,8 +56,21 @@ export async function apiFetch<T = any>(endpoint: string, options: FetchOptions 
 
   const token = getStoredAuthToken();
 
-  // Pre-flight check: if session has expired by timestamp, abort and redirect to login
+  // Pre-flight check: if session has expired by timestamp or crossed midnight into next day, abort
   if (typeof window !== "undefined" && token) {
+    const loginDate =
+      sessionStorage.getItem("girvi_login_date") ||
+      localStorage.getItem("girvi_login_date");
+    const todayDate = new Date().toDateString();
+
+    if (loginDate && loginDate !== todayDate) {
+      clearStoredAuth();
+      if (!window.location.pathname.includes("/login")) {
+        window.location.href = "/login?reason=daily_expiry";
+      }
+      throw new ApiError("Daily session expired. Please sign in for today's workday.", 401);
+    }
+
     const expiresAt = Number(
       sessionStorage.getItem("girvi_session_expires_at") ||
       localStorage.getItem("girvi_session_expires_at") ||
@@ -111,6 +126,11 @@ export const api = {
     }),
   logout: () => apiFetch<{ success: boolean }>("/api/auth/logout", { method: "POST" }),
   getMe: () => apiFetch<{ success: boolean; user: any }>("/api/auth/me"),
+  changePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
+    apiFetch<{ success: boolean; message: string }>("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
   // Customers
   getCustomers: (params?: { search?: string; page?: number; limit?: number }) =>
@@ -285,6 +305,25 @@ export const api = {
       `/api/repledges/${id}/interest/${paymentId}`,
       {
         method: "DELETE",
+      }
+    ),
+  updateRepledgeInterest: (
+    id: string,
+    paymentId: string,
+    data: {
+      paymentDate: string;
+      amount: number;
+      forMonth?: string;
+      paymentMode: string;
+      referenceNumber?: string;
+      remarks?: string;
+    }
+  ) =>
+    apiFetch<{ success: boolean; data: any; totalInterestPaid: string; message: string }>(
+      `/api/repledges/${id}/interest/${paymentId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
       }
     ),
 };

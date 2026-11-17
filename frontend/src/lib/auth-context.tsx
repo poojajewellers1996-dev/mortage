@@ -75,6 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (reason === "expired") {
         toast.info("Your session has expired. Please sign in again.");
         router.push("/login?reason=expired");
+      } else if (reason === "daily_expiry") {
+        toast.info("Daily security check: Please sign in for today's session.");
+        router.push("/login?reason=daily_expiry");
       } else {
         router.push("/login");
       }
@@ -89,22 +92,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(newUser);
 
       const now = Date.now();
-      const expiryDurationSeconds = expiresIn || (rememberMe ? 12 * 3600 : 4 * 3600);
+      const expiryDurationSeconds = expiresIn || (rememberMe ? 10 * 3600 : 4 * 3600);
       const expiresAt = now + expiryDurationSeconds * 1000;
+      const todayDate = new Date().toDateString();
 
       lastActivityRef.current = now;
 
       if (rememberMe) {
-        // Saved for the current workday (max 12 hours) in localStorage
+        // Saved for today's workday only in localStorage (strictly expires at midnight)
         sessionStorage.removeItem("girvi_token");
         sessionStorage.removeItem("girvi_user");
         sessionStorage.removeItem("girvi_session_expires_at");
         sessionStorage.removeItem("girvi_last_active");
+        sessionStorage.removeItem("girvi_login_date");
 
         localStorage.setItem("girvi_token", newToken);
         localStorage.setItem("girvi_user", JSON.stringify(newUser));
         localStorage.setItem("girvi_session_expires_at", String(expiresAt));
         localStorage.setItem("girvi_last_active", String(now));
+        localStorage.setItem("girvi_login_date", todayDate);
         localStorage.setItem("girvi_remember_me", "true");
       } else {
         // Single session: stored in sessionStorage only. Closed browser = Session destroyed!
@@ -112,12 +118,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem("girvi_user");
         localStorage.removeItem("girvi_session_expires_at");
         localStorage.removeItem("girvi_last_active");
+        localStorage.removeItem("girvi_login_date");
         localStorage.removeItem("girvi_remember_me");
 
         sessionStorage.setItem("girvi_token", newToken);
         sessionStorage.setItem("girvi_user", JSON.stringify(newUser));
         sessionStorage.setItem("girvi_session_expires_at", String(expiresAt));
         sessionStorage.setItem("girvi_last_active", String(now));
+        sessionStorage.setItem("girvi_login_date", todayDate);
       }
     },
     []
@@ -129,6 +137,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const storedToken = getStoredAuthToken();
     if (!storedToken) return false;
+
+    const loginDate =
+      sessionStorage.getItem("girvi_login_date") ||
+      localStorage.getItem("girvi_login_date");
+    const todayDate = new Date().toDateString();
+
+    // 0. Strict Daily Cutoff: If login date is from yesterday or earlier, logout immediately!
+    if (loginDate && loginDate !== todayDate) {
+      logout("daily_expiry");
+      return false;
+    }
 
     const expiresAt = Number(
       sessionStorage.getItem("girvi_session_expires_at") ||

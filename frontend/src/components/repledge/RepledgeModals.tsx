@@ -31,6 +31,8 @@ import {
   History,
   CreditCard,
   Clock,
+  Printer,
+  Save,
 } from "lucide-react";
 
 export const PLEDGER_NAMES = [
@@ -1303,6 +1305,7 @@ export function RepledgeInterestModal({
   const [paymentMode, setPaymentMode] = useState("Online / Bank Transfer");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
 
   // Month suggestions (current month and previous 3 months)
   const monthSuggestions = useMemo(() => {
@@ -1331,6 +1334,27 @@ export function RepledgeInterestModal({
     }
   };
 
+  const startEdit = (p: RepledgeInterestPayment) => {
+    setEditingPaymentId(p.id);
+    setPaymentDate(p.paymentDate);
+    setAmount(String(p.amount));
+    setForMonth(p.forMonth || "");
+    setPaymentMode(p.paymentMode || "Online / Bank Transfer");
+    setReferenceNumber(p.referenceNumber || "");
+    setRemarks(p.remarks || "");
+  };
+
+  const cancelEdit = () => {
+    setEditingPaymentId(null);
+    setAmount("");
+    setReferenceNumber("");
+    setRemarks("");
+    const currentMonth = new Date().toLocaleString("en-US", { month: "short", year: "numeric" });
+    setForMonth(currentMonth);
+    setPaymentDate(new Date().toISOString().split("T")[0]);
+    setPaymentMode("Online / Bank Transfer");
+  };
+
   useEffect(() => {
     if (isOpen && repledge) {
       fetchPayments();
@@ -1341,8 +1365,10 @@ export function RepledgeInterestModal({
       setReferenceNumber("");
       setRemarks("");
       setPaymentMode("Online / Bank Transfer");
+      setEditingPaymentId(null);
     } else {
       setPayments([]);
+      setEditingPaymentId(null);
     }
   }, [isOpen, repledge?.id]);
 
@@ -1364,30 +1390,52 @@ export function RepledgeInterestModal({
 
     setIsSubmitting(true);
     try {
-      const res = await api.addRepledgeInterest(repledge.id, {
-        paymentDate,
-        amount: numAmount,
-        forMonth: forMonth.trim() || undefined,
-        paymentMode,
-        referenceNumber: referenceNumber.trim() || undefined,
-        remarks: remarks.trim() || undefined,
-      });
+      if (editingPaymentId) {
+        const res = await api.updateRepledgeInterest(repledge.id, editingPaymentId, {
+          paymentDate,
+          amount: numAmount,
+          forMonth: forMonth.trim() || undefined,
+          paymentMode,
+          referenceNumber: referenceNumber.trim() || undefined,
+          remarks: remarks.trim() || undefined,
+        });
 
-      if (res.success) {
-        toast.success(res.message || "Interest payment recorded successfully");
-        setAmount("");
-        setReferenceNumber("");
-        setRemarks("");
-        // Reload payments
-        await fetchPayments();
-        if (onInterestUpdated) {
-          onInterestUpdated(repledge.id, res.totalInterestPaid);
+        if (res.success) {
+          toast.success(res.message || "Interest payment entry updated successfully");
+          cancelEdit();
+          await fetchPayments();
+          if (onInterestUpdated) {
+            onInterestUpdated(repledge.id, res.totalInterestPaid);
+          }
+        } else {
+          toast.error(res.message || "Failed to update interest payment");
         }
       } else {
-        toast.error(res.message || "Failed to record interest payment");
+        const res = await api.addRepledgeInterest(repledge.id, {
+          paymentDate,
+          amount: numAmount,
+          forMonth: forMonth.trim() || undefined,
+          paymentMode,
+          referenceNumber: referenceNumber.trim() || undefined,
+          remarks: remarks.trim() || undefined,
+        });
+
+        if (res.success) {
+          toast.success(res.message || "Interest payment recorded successfully");
+          setAmount("");
+          setReferenceNumber("");
+          setRemarks("");
+          // Reload payments
+          await fetchPayments();
+          if (onInterestUpdated) {
+            onInterestUpdated(repledge.id, res.totalInterestPaid);
+          }
+        } else {
+          toast.error(res.message || "Failed to record interest payment");
+        }
       }
     } catch (err: any) {
-      toast.error(err.message || "Error recording interest payment");
+      toast.error(err.message || "Error saving interest payment");
     } finally {
       setIsSubmitting(false);
     }
@@ -1472,10 +1520,24 @@ export function RepledgeInterestModal({
           <div className="bg-slate-50/80 rounded-xl p-4 sm:p-5 border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
               <div className="flex items-center gap-2">
-                <Receipt className="h-4 w-4 text-amber-600" />
-                <h4 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wide">
-                  Record Monthly Interest Payment (ब्याज भुगतान दर्ज करें)
-                </h4>
+                {editingPaymentId ? (
+                  <>
+                    <Pencil className="h-4 w-4 text-amber-600" />
+                    <h4 className="text-xs sm:text-sm font-bold text-amber-950 uppercase tracking-wide">
+                      Edit Interest Payment Entry (ब्याज प्रविष्टि सुधारें)
+                    </h4>
+                    <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-2 py-0.5 rounded-full">
+                      Editing Mode
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="h-4 w-4 text-amber-600" />
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wide">
+                      Record Monthly Interest Payment (ब्याज भुगतान दर्ज करें)
+                    </h4>
+                  </>
+                )}
               </div>
               <span className="text-[11px] text-slate-500 font-medium">Monthly bank interest tracking</span>
             </div>
@@ -1584,15 +1646,32 @@ export function RepledgeInterestModal({
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <div className="flex justify-end pt-1">
+              {/* Submit Button & Cancel button if editing */}
+              <div className="flex items-center justify-end gap-2 pt-1">
+                {editingPaymentId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={cancelEdit}
+                    className="text-xs h-9 px-3"
+                  >
+                    Cancel Edit
+                  </Button>
+                )}
                 <Button
                   type="submit"
                   disabled={isSubmitting}
                   className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-9 px-4 gap-1.5 shadow-sm"
                 >
-                  <Plus className="h-4 w-4" />
-                  <span>{isSubmitting ? "Recording Entry..." : "Save Interest Payment (ब्याज दर्ज करें)"}</span>
+                  {editingPaymentId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                  <span>
+                    {isSubmitting
+                      ? "Saving..."
+                      : editingPaymentId
+                      ? "Update Interest Entry (संशोधन सेव करें)"
+                      : "Save Interest Payment (ब्याज दर्ज करें)"}
+                  </span>
                 </Button>
               </div>
             </form>
@@ -1676,13 +1755,21 @@ export function RepledgeInterestModal({
                         <td className="py-2.5 px-3 text-slate-600 italic text-[11px]">
                           {p.remarks || "-"}
                         </td>
-                        <td className="py-2.5 px-3 text-center">
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(p)}
+                            className="p-1 rounded text-slate-400 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer mr-1"
+                            title="Edit Payment Entry (सुधारें)"
+                          >
+                            <Pencil className="h-3.5 w-3.5 text-amber-600" />
+                          </button>
                           <button
                             type="button"
                             disabled={deletingPaymentId === p.id}
                             onClick={() => handleDelete(p.id)}
                             className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                            title="Delete Payment Entry"
+                            title="Delete Payment Entry (हटाएं)"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -1713,8 +1800,20 @@ export function RepledgeInterestModal({
 
         {/* Modal Footer */}
         <div className="flex items-center justify-between px-6 py-3 bg-slate-50 border-t border-slate-200 shrink-0">
-          <div className="text-xs text-slate-500">
-            Total Interest Recorded: <span className="font-bold text-amber-950">{formatIndianCurrency(totalCalculated)}</span>
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-slate-500">
+              Total Interest Recorded: <span className="font-bold text-amber-950">{formatIndianCurrency(totalCalculated)}</span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              className="gap-1.5 text-xs text-slate-700 font-semibold h-7"
+            >
+              <Printer className="h-3.5 w-3.5 text-slate-600" />
+              <span>Print Ledger</span>
+            </Button>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
             Close
