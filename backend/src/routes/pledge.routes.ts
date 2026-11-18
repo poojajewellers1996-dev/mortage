@@ -39,7 +39,7 @@ const createPledgeSchema = z.object({
       email: z.string().email().optional().nullable().or(z.literal('')),
       monthlyIncome: z.union([z.number(), z.string()]).default(0),
       address: z.string().min(3),
-      city: z.string().default('Mumbai'),
+      city: z.string().default('Bangalore'),
       pincode: z.string().optional().nullable(),
       photoUrl: z.string().optional().nullable(),
     })
@@ -468,7 +468,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
               email: data.customer.email || null,
               monthlyIncome: String(data.customer.monthlyIncome || 0),
               address: data.customer.address.trim(),
-              city: data.customer.city || 'Mumbai',
+              city: data.customer.city || 'Bangalore',
               pincode: data.customer.pincode || null,
               photoUrl: data.customer.photoUrl || null,
             })
@@ -753,7 +753,7 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
                 Math.max(
                   0,
                   (parseFloat(String(a.grossWeight)) || 0) -
-                    (parseFloat(String(a.lessWeight || 0)) || 0)
+                  (parseFloat(String(a.lessWeight || 0)) || 0)
                 )),
             0
           );

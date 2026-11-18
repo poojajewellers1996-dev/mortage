@@ -324,7 +324,7 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
               <p className="text-[11px] text-amber-900 font-medium flex items-center gap-1.5 pt-0.5">
                 <Sparkles className="h-3.5 w-3.5 text-amber-700 shrink-0" />
                 <span>
-                  Registering a <strong>separate new customer profile</strong> under shared mobile #{customer.mobileNumber}. Address and city are preserved.
+                  Registering a <strong>separate new customer profile</strong> under shared mobile #{customer.mobileNumber}. Address is preserved.
                 </span>
               </p>
             )}
@@ -381,27 +381,6 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
             onChange={(e) => onChange("address", e.target.value)}
             required
             className="flex w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 resize-none shadow-sm"
-          />
-        </div>
-
-        {/* City and PIN Code */}
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="customerCity">City / Town / Village</Label>
-          <Input
-            id="customerCity"
-            placeholder="e.g. Budigere, Bangalore"
-            value={customer.city || ""}
-            onChange={(e) => onChange("city", e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-1.5 sm:col-span-1">
-          <Label htmlFor="customerPincode">PIN Code</Label>
-          <Input
-            id="customerPincode"
-            placeholder="e.g. 562129"
-            value={customer.pincode || ""}
-            onChange={(e) => onChange("pincode", e.target.value)}
           />
         </div>
 
