@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import {
   EditModal,
   DeleteModal,
+  UndoReleaseModal,
 } from "@/components/girvi/PledgeActionModals";
 import {
   Search,
@@ -27,6 +28,7 @@ import {
   ArrowDown,
   Edit,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 
 type SortField =
@@ -52,6 +54,7 @@ function ReleasedGirviPageInner() {
   // Action Modals State
   const [editModalPledge, setEditModalPledge] = useState<Pledge | null>(null);
   const [deleteModalPledge, setDeleteModalPledge] = useState<Pledge | null>(null);
+  const [undoModalPledge, setUndoModalPledge] = useState<Pledge | null>(null);
 
   useEffect(() => {
     fetchReleasedPledges();
@@ -355,6 +358,18 @@ function ReleasedGirviPageInner() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {/* UNDO RELEASE BUTTON */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setUndoModalPledge(p)}
+                            className="h-7 px-2 text-xs text-amber-700 hover:bg-amber-100 hover:text-amber-900 transition-colors gap-1 font-semibold"
+                            title="Undo Release / Re-open Girvi (छुड़ाई वापस लें / री-ओपन)"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                            <span className="hidden sm:inline">Undo</span>
+                          </Button>
+
                           {/* EDIT BUTTON */}
                           <Button
                             variant="ghost"
@@ -449,6 +464,15 @@ function ReleasedGirviPageInner() {
         onClose={() => setDeleteModalPledge(null)}
         onSuccess={(deletedId) => {
           setPledges((prev) => prev.filter((p) => p.id !== deletedId));
+        }}
+      />
+
+      <UndoReleaseModal
+        isOpen={!!undoModalPledge}
+        pledge={undoModalPledge}
+        onClose={() => setUndoModalPledge(null)}
+        onSuccess={(restoredId) => {
+          setPledges((prev) => prev.filter((p) => p.id !== restoredId));
         }}
       />
     </div>

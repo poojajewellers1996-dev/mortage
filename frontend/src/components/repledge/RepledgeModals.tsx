@@ -33,6 +33,7 @@ import {
   Clock,
   Printer,
   Save,
+  RotateCcw,
 } from "lucide-react";
 
 export const PLEDGER_NAMES = [
@@ -1988,6 +1989,137 @@ export function RepledgeInterestModal({
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
             Close
           </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                     UNDO BANK RE-PLEDGE RELEASE MODAL                      */
+/* -------------------------------------------------------------------------- */
+
+interface UndoRepledgeReleaseModalProps {
+  isOpen: boolean;
+  repledge: Repledge | null;
+  onClose: () => void;
+  onSuccess: (repledgeId: string) => void;
+}
+
+export function UndoRepledgeReleaseModal({
+  isOpen,
+  repledge,
+  onClose,
+  onSuccess,
+}: UndoRepledgeReleaseModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen || !repledge) return null;
+
+  const handleUndo = async () => {
+    setIsSubmitting(true);
+    try {
+      const res = await api.undoReleaseRepledge(repledge.id);
+      if (res.success) {
+        toast.success(`Bank Re-Pledge #${repledge.bankPledgeNumber} restored to Active!`);
+        onSuccess(repledge.id);
+        onClose();
+      } else {
+        toast.error((res as any).message || (res as any).error || "Failed to undo release.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error undoing bank re-pledge release.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-amber-600 text-white">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-white/20">
+              <RotateCcw className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold">Undo Bank Release (बैंक छुड़ाई रद्द करें)</h3>
+              <p className="text-[11px] text-amber-100">Restore back to Active Bank Re-Pledges</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          <div className="flex items-start gap-3 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+            <RotateCcw className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Did you release this Bank Re-Pledge by mistake?</p>
+              <p className="mt-1 text-amber-800 leading-relaxed">
+                Bank loan <strong className="text-slate-900">#{repledge.bankPledgeNumber}</strong> ({repledge.bankName})
+                will be restored to <strong className="text-emerald-700">Active Re-Pledges</strong>, and its linked Girvis will once again be locked under this bank re-pledge.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2 text-slate-700">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Bank Pledge #:</span>
+              <span className="font-mono font-bold text-slate-900 text-sm">{repledge.bankPledgeNumber}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Bank / NBFC:</span>
+              <span className="font-semibold text-slate-900">{repledge.bankName}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Pledger Name:</span>
+              <span className="font-bold text-slate-900">{repledge.pledgerName}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Bank Loan Amount:</span>
+              <span className="font-bold text-slate-900">₹{parseFloat(String(repledge.bankPledgeAmount || 0)).toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Released On:</span>
+              <span className="font-mono text-emerald-700 font-semibold">{repledge.releasedDate || "—"}</span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2.5 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isSubmitting}
+              onClick={onClose}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleUndo}
+              className="bg-amber-600 hover:bg-amber-700 text-white gap-2 font-bold text-xs px-4"
+            >
+              {isSubmitting ? (
+                <span>Restoring...</span>
+              ) : (
+                <>
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Yes, Undo Release (वापस एक्टिव करें)</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

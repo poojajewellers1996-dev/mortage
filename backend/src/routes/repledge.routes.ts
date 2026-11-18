@@ -758,6 +758,103 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // POST /api/repledges/:id/undo-release - Undo release and restore bank repledge to active
+  fastify.post('/:id/undo-release', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    try {
+      const existing = await db.select().from(repledges).where(eq(repledges.id, id)).limit(1);
+      if (existing.length === 0) {
+        return reply.status(404).send({ success: false, error: 'Bank re-pledge not found' });
+      }
+
+      if (existing[0].status !== 'released') {
+        return reply.status(400).send({ success: false, error: 'Repledge is not released' });
+      }
+
+      const links = await db.select().from(repledgePledges).where(eq(repledgePledges.repledgeId, id));
+      const pledgeIds = links.map(l => l.pledgeId);
+
+      await db.transaction(async tx => {
+        // 1. Mark repledge as active again
+        await tx
+          .update(repledges)
+          .set({
+            status: 'active',
+            releasedDate: null,
+            releaseRemarks: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(repledges.id, id));
+
+        // 2. Re-mark linked pledges as repledged
+        for (const pid of pledgeIds) {
+          const allActiveLinks = await tx
+            .select({ bankName: repledges.bankName, id: repledges.id })
+            .from(repledgePledges)
+            .innerJoin(repledges, eq(repledgePledges.repledgeId, repledges.id))
+            .where(
+              and(
+                eq(repledgePledges.pledgeId, pid),
+                eq(repledges.status, 'active')
+              )
+            );
+
+          const bankSet = new Set(allActiveLinks.map(l => l.bankName));
+          bankSet.add(existing[0].bankName);
+          const combinedBanks = Array.from(bankSet).join(', ');
+
+          await tx
+            .update(pledges)
+            .set({
+              isRepledged: true,
+              repledgeId: id,
+              repledgedBankName: combinedBanks,
+              updatedAt: new Date(),
+            })
+            .where(eq(pledges.id, pid));
+
+          await tx
+            .update(pledgeArticles)
+            .set({
+              isRepledged: true,
+              repledgedBankName: combinedBanks,
+              updatedAt: new Date(),
+            })
+            .where(eq(pledgeArticles.pledgeId, pid));
+        }
+      });
+
+      const user = (request as any).user;
+      await AuditService.log({
+        userId: user?.id,
+        action: 'UNDO_RELEASE_REPLEDGE',
+        entityName: 'repledges',
+        entityId: id,
+        details: {
+          bankPledgeNumber: existing[0].bankPledgeNumber,
+          bankName: existing[0].bankName,
+          restoredPledgeCount: pledgeIds.length,
+        },
+      });
+
+      return reply.send({
+        success: true,
+        message: `Bank Re-pledge #${existing[0].bankPledgeNumber} release undone successfully! Restored to Active Re-Pledges.`,
+        data: {
+          id,
+          status: 'active',
+        },
+      });
+    } catch (err: any) {
+      request.log.error(err);
+      return reply.status(500).send({
+        success: false,
+        error: err.message || 'Failed to undo release of repledge',
+      });
+    }
+  });
+
   // DELETE /api/repledges/:id - Delete repledge (unlinks if active)
   fastify.delete('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };

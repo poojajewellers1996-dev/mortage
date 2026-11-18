@@ -9,6 +9,7 @@ import {
   ViewRepledgeModal,
   DeleteRepledgeModal,
   RepledgeInterestModal,
+  UndoRepledgeReleaseModal,
   BANK_NAMES,
   PLEDGER_NAMES,
 } from "@/components/repledge/RepledgeModals";
@@ -33,6 +34,7 @@ import {
   Landmark,
   ArrowLeft,
   Receipt,
+  RotateCcw,
 } from "lucide-react";
 
 type SortField = "bankPledgeNumber" | "bankName" | "pledgerName" | "bankPledgeDate" | "releasedDate" | "weight" | "amount" | "interestPaid";
@@ -55,6 +57,7 @@ function ReleasedRepledgePageInner() {
   const [viewModalRepledge, setViewModalRepledge] = useState<Repledge | null>(null);
   const [deleteModalRepledge, setDeleteModalRepledge] = useState<Repledge | null>(null);
   const [interestModalRepledge, setInterestModalRepledge] = useState<Repledge | null>(null);
+  const [undoModalRepledge, setUndoModalRepledge] = useState<Repledge | null>(null);
 
   const fetchReleasedRepledges = () => {
     setIsLoading(true);
@@ -487,6 +490,16 @@ function ReleasedRepledgePageInner() {
                       {/* Actions */}
                       <td className="py-2.5 px-3 text-center">
                         <div className="inline-flex items-center gap-1">
+                          {/* Undo Release Button */}
+                          <button
+                            type="button"
+                            onClick={() => setUndoModalRepledge(r)}
+                            className="p-1 rounded text-amber-700 hover:text-amber-900 hover:bg-amber-100 transition-colors cursor-pointer"
+                            title="Undo Release / Restore to Active Bank Re-Pledges"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </button>
+
                           {/* Interest Button */}
                           <button
                             type="button"
@@ -556,6 +569,15 @@ function ReleasedRepledgePageInner() {
               prev ? { ...prev, totalInterestPaid: newTotal } : null
             );
           }
+        }}
+      />
+
+      <UndoRepledgeReleaseModal
+        isOpen={!!undoModalRepledge}
+        repledge={undoModalRepledge}
+        onClose={() => setUndoModalRepledge(null)}
+        onSuccess={(restoredId) => {
+          setRepledges((prev) => prev.filter((r) => r.id !== restoredId));
         }}
       />
     </div>

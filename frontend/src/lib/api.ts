@@ -176,6 +176,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(closureData),
     }),
+  undoClosePledge: (id: string) =>
+    apiFetch<{ success: boolean; message: string; data?: any }>(`/api/pledges/${id}/undo-close`, {
+      method: "POST",
+    }),
   deletePledge: (id: string) =>
     apiFetch<{ success: boolean; message: string }>(`/api/pledges/${id}`, {
       method: "DELETE",
@@ -275,6 +279,10 @@ export const api = {
     apiFetch<{ success: boolean; data: any; message: string }>(`/api/repledges/${id}/release`, {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+  undoReleaseRepledge: (id: string) =>
+    apiFetch<{ success: boolean; data: any; message: string }>(`/api/repledges/${id}/undo-release`, {
+      method: "POST",
     }),
   deleteRepledge: (id: string) =>
     apiFetch<{ success: boolean; message: string }>(`/api/repledges/${id}`, {

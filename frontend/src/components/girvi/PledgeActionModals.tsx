@@ -26,6 +26,7 @@ import {
   User,
   Phone,
   MapPin,
+  RotateCcw,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -1073,6 +1074,137 @@ export function DeleteModal({
                 <>
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>Yes, Delete Pledge</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                            UNDO RELEASE MODAL                              */
+/* -------------------------------------------------------------------------- */
+
+interface UndoReleaseModalProps {
+  isOpen: boolean;
+  pledge: Pledge | null;
+  onClose: () => void;
+  onSuccess: (pledgeId: string) => void;
+}
+
+export function UndoReleaseModal({
+  isOpen,
+  pledge,
+  onClose,
+  onSuccess,
+}: UndoReleaseModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen || !pledge) return null;
+
+  const handleUndo = async () => {
+    setIsSubmitting(true);
+    try {
+      const res = await api.undoClosePledge(pledge.id);
+      if (res.success) {
+        toast.success(`Pledge #${pledge.pledgeNumber} release undone successfully! Restored to Active Pledges.`);
+        onSuccess(pledge.id);
+        onClose();
+      } else {
+        toast.error((res as any).message || (res as any).error || "Failed to undo release.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error undoing pledge release.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-amber-600 text-white">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-white/20">
+              <RotateCcw className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold">Undo Release (छुड़ाई वापस लें)</h3>
+              <p className="text-[11px] text-amber-100">Re-open Girvi back to Active Pledges</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          <div className="flex items-start gap-3 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+            <RotateCcw className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Did you release this Girvi by mistake?</p>
+              <p className="mt-1 text-amber-800 leading-relaxed">
+                Girvi <strong className="text-slate-900">#{pledge.pledgeNumber}</strong> for{" "}
+                <strong className="text-slate-900">{pledge.customer?.name}</strong> will be moved back
+                to <strong className="text-emerald-700">Active Pledges</strong>. Its closure date and redemption settlement payment will be removed.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2 text-slate-700">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Pledge Number:</span>
+              <span className="font-mono font-bold text-slate-900 text-sm">{pledge.pledgeNumber}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Customer:</span>
+              <span className="font-semibold text-slate-900">{pledge.customer?.name || "—"}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Principal Loan:</span>
+              <span className="font-bold text-slate-900">₹{parseFloat(String(pledge.totalLoanAmount || 0)).toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Released On:</span>
+              <span className="font-mono text-emerald-700 font-semibold">{pledge.closedDate || "—"}</span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2.5 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isSubmitting}
+              onClick={onClose}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleUndo}
+              className="bg-amber-600 hover:bg-amber-700 text-white gap-2 font-bold text-xs px-4"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Re-opening...</span>
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Yes, Undo Release (वापस चालू करें)</span>
                 </>
               )}
             </Button>

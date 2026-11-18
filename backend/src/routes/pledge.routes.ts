@@ -873,6 +873,84 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // POST /api/pledges/:id/undo-close (Re-open a closed/released pledge)
+  fastify.post('/:id/undo-close', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    try {
+      const existing = await db.select().from(pledges).where(eq(pledges.id, id)).limit(1);
+      if (existing.length === 0) {
+        return reply.status(404).send({ success: false, error: 'Pledge not found' });
+      }
+
+      if (existing[0].status !== 'closed' && !existing[0].closedDate) {
+        return reply.status(400).send({ success: false, error: 'Pledge is not closed or released' });
+      }
+
+      // Compute appropriate active status based on due date
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDate = new Date(existing[0].dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+      let restoredStatus = 'active';
+      if (diffDays < 0) {
+        restoredStatus = 'overdue';
+      } else if (diffDays <= 15) {
+        restoredStatus = 'due_soon';
+      }
+
+      await db.transaction(async tx => {
+        // Remove closure payment record(s) created during release
+        await tx
+          .delete(payments)
+          .where(
+            and(
+              eq(payments.pledgeId, id),
+              eq(payments.paymentType, 'closure')
+            )
+          );
+
+        // Re-open the pledge: clear closedDate and closureRemarks, restore status
+        await tx
+          .update(pledges)
+          .set({
+            status: restoredStatus,
+            closedDate: null,
+            closureRemarks: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(pledges.id, id));
+      });
+
+      await AuditService.log({
+        userId: request.user?.id,
+        action: 'UNDO_CLOSE_PLEDGE',
+        entityName: 'pledges',
+        entityId: id,
+        details: {
+          pledgeNumber: existing[0].pledgeNumber,
+          previousClosedDate: existing[0].closedDate,
+          restoredStatus,
+        },
+        ipAddress: request.ip,
+      });
+
+      return reply.send({
+        success: true,
+        message: `Girvi #${existing[0].pledgeNumber} release undone successfully! Re-opened under Active Pledges.`,
+        data: { id, status: restoredStatus },
+      });
+    } catch (err: any) {
+      request.log.error(err);
+      return reply.status(500).send({
+        success: false,
+        error: err.message || 'Failed to undo release',
+      });
+    }
+  });
+
   // GET /api/pledges/:id/receipt (Complete data for print & PDF)
   fastify.get('/:id/receipt', async (request, reply) => {
     try {

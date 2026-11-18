@@ -26,7 +26,9 @@ import {
   CreditCard,
   X,
   FileText,
+  RotateCcw,
 } from "lucide-react";
+import { UndoReleaseModal } from "@/components/girvi/PledgeActionModals";
 
 export default function PledgeDetailsPage() {
   const params = useParams();
@@ -41,6 +43,7 @@ export default function PledgeDetailsPage() {
 
   // Close Pledge Modal
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showUndoModal, setShowUndoModal] = useState(false);
   const [closeAmount, setCloseAmount] = useState<string>("");
   const [paymentMode, setPaymentMode] = useState<string>("Cash");
   const [closureRemarks, setClosureRemarks] = useState<string>("Full redemption and release of ornaments");
@@ -154,7 +157,7 @@ export default function PledgeDetailsPage() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {pledge.status !== "closed" && (
+          {pledge.status !== "closed" ? (
             <Button
               variant="outline"
               size="sm"
@@ -163,6 +166,17 @@ export default function PledgeDetailsPage() {
             >
               <CheckCircle2 className="h-4 w-4" />
               Redeem & Close
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUndoModal(true)}
+              className="gap-2 text-amber-700 border-amber-300 hover:bg-amber-50 font-semibold shadow-xs"
+              title="Undo Release and restore to Active Girvi"
+            >
+              <RotateCcw className="h-4 w-4 text-amber-600" />
+              Undo Release (छुड़ाई वापस लें)
             </Button>
           )}
 
@@ -456,6 +470,16 @@ export default function PledgeDetailsPage() {
           </div>
         </div>
       )}
+
+      {/* Undo Release Modal */}
+      <UndoReleaseModal
+        isOpen={showUndoModal}
+        pledge={pledge}
+        onClose={() => setShowUndoModal(false)}
+        onSuccess={() => {
+          fetchDetails();
+        }}
+      />
     </div>
   );
 }
