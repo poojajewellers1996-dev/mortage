@@ -449,10 +449,6 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
         (sum, p) => sum + (parseFloat(p.totalNetWeight) || 0),
         0
       );
-      const totalOurLoanAmount = targetPledges.reduce(
-        (sum, p) => sum + (parseFloat(p.totalLoanAmount) || 0),
-        0
-      );
       const pledgeNumbers = targetPledges.map(p => p.pledgeNumber);
 
       await db.transaction(async tx => {
@@ -584,7 +580,7 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
             bankPledgeAmount: String(newPledgeAmount),
             totalGrossWeight: totalGrossWeight.toFixed(3),
             totalNetWeight: totalNetWeight.toFixed(3),
-            totalOurLoanAmount: totalOurLoanAmount.toFixed(2),
+            totalPledgesCount: targetPledges.length,
             linkedPledgeNumbers: pledgeNumbers,
             remarks: newRemarks,
             updatedAt: new Date(),

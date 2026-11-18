@@ -36,6 +36,7 @@ async function seed() {
 
     // 2. Users (Admin)
     const adminPasswordHash = await hashPassword('Deepak@123');
+    const staffPasswordHash = await hashPassword('Staff@123');
 
     const adminUser = await db
       .insert(users)
