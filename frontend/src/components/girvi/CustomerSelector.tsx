@@ -7,7 +7,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
 import { CameraModal } from "./CameraModal";
-import { Camera, Upload, User, CheckCircle2, X, Sparkles, Loader2 } from "lucide-react";
+import { Camera, Upload, User, CheckCircle2, X, Sparkles, Loader2, Users, Check, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 interface CustomerSelectorProps {
@@ -32,7 +32,9 @@ interface CustomerSelectorProps {
 export function CustomerSelector({ customer, onChange, onSelectExisting }: CustomerSelectorProps) {
   const [isSearchingMobile, setIsSearchingMobile] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [matchedFamilyMembers, setMatchedFamilyMembers] = useState<Customer[]>([]);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleMobileChange = (val: string) => {
     onChange("mobileNumber", val);
@@ -50,13 +52,35 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
       searchTimeoutRef.current = setTimeout(async () => {
         setIsSearchingMobile(true);
         try {
-          const res = await api.getCustomers({ search: searchDigits, limit: 1 });
+          const res = await api.getCustomers({ search: searchDigits, limit: 20 });
           if (res.success && res.data && res.data.length > 0) {
-            const match = res.data[0];
-            onSelectExisting(match);
-            toast.success(`Existing Customer Found: ${match.name}! KYC details auto-filled.`);
+            // Filter customers whose mobile number actually matches this 10-digit number
+            const phoneMatches = res.data.filter((c: Customer) => {
+              const cDigits = (c.mobileNumber || "").replace(/\D/g, "");
+              return cDigits.endsWith(searchDigits) || cDigits === searchDigits;
+            });
+
+            setMatchedFamilyMembers(phoneMatches);
+
+            if (phoneMatches.length === 1) {
+              const match = phoneMatches[0];
+              // If user hasn't typed a custom name yet or if currently on that customer, auto-fill
+              if (!customer.name.trim() || (customer.id && customer.id === match.id)) {
+                onSelectExisting(match);
+                toast.success(`Found customer: ${match.name}! (Shared number? Click 'New Person / Wife' if relative is pledging)`);
+              }
+            } else if (phoneMatches.length > 1) {
+              // Multiple family members share this number
+              toast.info(`Found ${phoneMatches.length} family members sharing this mobile number. Please choose who is pledging.`);
+              // If currently selected customer is not among the matches, don't arbitrarily pick one
+              const isCurrentInMatches = phoneMatches.some((m) => m.id === customer.id);
+              if (!isCurrentInMatches && !customer.name.trim()) {
+                // Auto-suggest the first one, but banner will prominently display options
+                onSelectExisting(phoneMatches[0]);
+              }
+            }
           } else {
-            // Unlink if no customer match
+            setMatchedFamilyMembers([]);
             if (customer.id) {
               onChange("id", null);
             }
@@ -68,8 +92,57 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
         }
       }, 350);
     } else {
+      setMatchedFamilyMembers([]);
       if (customer.id) {
         onChange("id", null);
+      }
+    }
+  };
+
+  const handleSelectMember = (member: Customer) => {
+    onSelectExisting(member);
+    toast.success(`Selected customer: ${member.name} (${member.relationType} ${member.relationName || "N/A"})`);
+  };
+
+  const handleStartNewFamilyMember = () => {
+    onChange("id", null);
+    onChange("name", "");
+    onChange("photoUrl", null);
+
+    // If existing member was husband (e.g. S/O), suggest wife (W/O with husband's name)
+    if (matchedFamilyMembers.length > 0) {
+      const first = matchedFamilyMembers[0];
+      if (first.relationType === "S/O") {
+        onChange("relationType", "W/O");
+        onChange("relationName", first.name);
+      } else {
+        onChange("relationType", "W/O");
+      }
+    }
+
+    toast.info("Switched to new family member. Type the customer's name below.");
+    setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 100);
+  };
+
+  const handleNameChange = (val: string) => {
+    onChange("name", val);
+
+    // If an existing customer was linked, but user types a different name (e.g. wife instead of husband):
+    if (customer.id) {
+      const selectedMember = matchedFamilyMembers.find((m) => m.id === customer.id);
+      if (selectedMember && selectedMember.name.trim().toLowerCase() !== val.trim().toLowerCase()) {
+        // Check if the typed name matches another family member in matched list
+        const otherMatch = matchedFamilyMembers.find(
+          (m) => m.name.trim().toLowerCase() === val.trim().toLowerCase()
+        );
+        if (otherMatch) {
+          onSelectExisting(otherMatch);
+        } else {
+          // Unlink ID so this creates a distinct new customer profile for this family member!
+          onChange("id", null);
+        }
       }
     }
   };
@@ -164,18 +237,99 @@ export function CustomerSelector({ customer, onChange, onSelectExisting }: Custo
 
         {/* Customer Full Name */}
         <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="customerName">
-            Customer Full Name <span className="text-rose-600">*</span>
-          </Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="customerName">
+              Customer Full Name <span className="text-rose-600">*</span>
+            </Label>
+            {customer.id ? (
+              <span className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                Linked Customer Profile
+              </span>
+            ) : customer.mobileNumber.length >= 10 ? (
+              <span className="text-[10px] text-amber-800 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                New Person with this Mobile
+              </span>
+            ) : null}
+          </div>
           <Input
             id="customerName"
-            placeholder="e.g. Ramesh Chandra Patel"
+            ref={nameInputRef}
+            placeholder="e.g. Ramesh Chandra / Muniyamma"
             value={customer.name}
-            onChange={(e) => onChange("name", e.target.value)}
+            onChange={(e) => handleNameChange(e.target.value)}
             required
-            className="font-medium"
+            className="font-bold text-slate-900"
           />
         </div>
+
+        {/* Family Members / Shared Mobile Number Detection Banner */}
+        {matchedFamilyMembers.length > 0 && (
+          <div className="sm:col-span-3 p-3.5 bg-amber-50/90 rounded-xl border border-amber-300 space-y-2.5 animate-in fade-in duration-200 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-amber-200/80 pb-2">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded-md bg-amber-200/80 text-amber-900">
+                  <Users className="h-4 w-4" />
+                </div>
+                <span className="text-xs font-bold text-amber-950">
+                  {matchedFamilyMembers.length === 1
+                    ? "Registered Customer with this Phone Number:"
+                    : `${matchedFamilyMembers.length} Family Members Found with Phone #${customer.mobileNumber}:`}
+                </span>
+              </div>
+              <span className="text-[11px] text-amber-800 font-semibold">
+                Select who is keeping the pledge today (पति / पत्नी / अन्य सदस्य):
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {matchedFamilyMembers.map((member) => {
+                const isSelected = customer.id === member.id;
+                return (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => handleSelectMember(member)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                      isSelected
+                        ? "bg-[#0F1E36] text-white shadow-sm ring-2 ring-amber-500"
+                        : "bg-white text-slate-800 border border-slate-300 hover:bg-amber-100/70 hover:border-amber-300"
+                    }`}
+                  >
+                    <User className={`h-3.5 w-3.5 ${isSelected ? "text-amber-400" : "text-slate-500"}`} />
+                    <span>{member.name}</span>
+                    <span className={`text-[10px] font-normal ${isSelected ? "text-slate-300" : "text-slate-500"}`}>
+                      ({member.relationType} {member.relationName || "—"})
+                    </span>
+                    {isSelected && <Check className="h-3.5 w-3.5 text-emerald-400 stroke-[3]" />}
+                  </button>
+                );
+              })}
+
+              {/* Button to register wife/different person sharing this phone number */}
+              <button
+                type="button"
+                onClick={handleStartNewFamilyMember}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  !customer.id
+                    ? "bg-amber-600 text-white shadow-sm ring-2 ring-amber-300 font-extrabold"
+                    : "bg-amber-100/80 text-amber-900 border border-amber-300 hover:bg-amber-200"
+                }`}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>+ Different Person / Wife (पत्नी या अन्य सदस्य)</span>
+              </button>
+            </div>
+
+            {!customer.id && (
+              <p className="text-[11px] text-amber-900 font-medium flex items-center gap-1.5 pt-0.5">
+                <Sparkles className="h-3.5 w-3.5 text-amber-700 shrink-0" />
+                <span>
+                  Registering a <strong>separate new customer profile</strong> under shared mobile #{customer.mobileNumber}. Address and city are preserved.
+                </span>
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Relation Type */}
         <div className="space-y-1.5">

@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { customers, pledges } from '../db/schema.js';
-import { eq, or, ilike, sql, desc } from 'drizzle-orm';
+import { eq, or, ilike, sql, desc, and } from 'drizzle-orm';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { requireRole } from '../middlewares/role.middleware.js';
 import { AuditService } from '../services/audit.service.js';
@@ -148,18 +148,23 @@ export async function customerRoutes(fastify: FastifyInstance) {
     const data = parseResult.data;
 
     try {
-      // Check for existing customer with same mobile if provided
-      if (data.mobileNumber && data.mobileNumber.trim()) {
+      // Check for existing customer with same mobile and same name (allowing multiple family members on one phone number)
+      if (data.mobileNumber && data.mobileNumber.trim() && data.name && data.name.trim()) {
         const existing = await db
           .select()
           .from(customers)
-          .where(eq(customers.mobileNumber, data.mobileNumber.trim()))
+          .where(
+            and(
+              eq(customers.mobileNumber, data.mobileNumber.trim()),
+              ilike(customers.name, data.name.trim())
+            )
+          )
           .limit(1);
 
         if (existing.length > 0) {
           return reply.status(409).send({
             success: false,
-            error: `A customer with mobile number ${data.mobileNumber} already exists (${existing[0].name}).`,
+            error: `A customer named "${data.name}" with mobile number ${data.mobileNumber} already exists.`,
             existingCustomer: existing[0],
           });
         }

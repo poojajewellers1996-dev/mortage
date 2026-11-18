@@ -423,14 +423,21 @@ export async function pledgeRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Check if customer exists by mobile if mobile provided
+        // Check if customer exists by BOTH mobile AND name (so husband and wife sharing a phone number remain separate profiles)
         let existingCust: any[] = [];
         const cleanMobile = data.customer.mobileNumber ? data.customer.mobileNumber.trim() : null;
-        if (cleanMobile) {
+        const cleanName = data.customer.name ? data.customer.name.trim() : null;
+
+        if (cleanMobile && cleanName) {
           existingCust = await db
             .select()
             .from(customers)
-            .where(eq(customers.mobileNumber, cleanMobile))
+            .where(
+              and(
+                eq(customers.mobileNumber, cleanMobile),
+                ilike(customers.name, cleanName)
+              )
+            )
             .limit(1);
         }
 
