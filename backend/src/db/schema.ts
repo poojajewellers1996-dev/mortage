@@ -185,7 +185,7 @@ export const repledgePledges = pgTable('repledge_pledges', {
   id: uuid('id').defaultRandom().primaryKey(),
   repledgeId: uuid('repledge_id').notNull().references(() => repledges.id, { onDelete: 'cascade' }),
   pledgeId: uuid('pledge_id').notNull().references(() => pledges.id, { onDelete: 'cascade' }),
-  pledgeNumber: varchar('pledge_number', { length: 50 }).notNull(),
+  pledgeNumber: varchar('pledge_number', { length: 50 }).default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

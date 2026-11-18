@@ -35,6 +35,16 @@ async function migrateRepledge() {
       ALTER TABLE pledges ADD COLUMN IF NOT EXISTS is_repledged BOOLEAN NOT NULL DEFAULT FALSE;
       ALTER TABLE pledges ADD COLUMN IF NOT EXISTS repledge_id UUID REFERENCES repledges(id) ON DELETE SET NULL;
       ALTER TABLE pledges ADD COLUMN IF NOT EXISTS repledged_bank_name VARCHAR(255);
+
+      -- Ensure pledge_number in repledge_pledges is nullable or has default
+      ALTER TABLE repledge_pledges ALTER COLUMN pledge_number DROP NOT NULL;
+      ALTER TABLE repledge_pledges ALTER COLUMN pledge_number SET DEFAULT '';
+
+      -- Backfill any missing pledge numbers from pledges table
+      UPDATE repledge_pledges rp
+      SET pledge_number = p.pledge_number
+      FROM pledges p
+      WHERE rp.pledge_id = p.id AND (rp.pledge_number IS NULL OR rp.pledge_number = '');
     `);
     console.log('✅ Repledge tables and columns created successfully in PostgreSQL!');
   } catch (err) {

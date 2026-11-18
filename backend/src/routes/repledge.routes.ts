@@ -292,7 +292,7 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
           await tx.insert(repledgePledges).values({
             repledgeId: createdRepledge.id,
             pledgeId: p.id,
-            pledgeNumber: p.pledgeNumber,
+            pledgeNumber: p.pledgeNumber || '',
           });
 
           // Fetch all active banks this pledge is currently part of
@@ -528,9 +528,11 @@ export async function repledgeRoutes(fastify: FastifyInstance) {
 
         // 2. If new pledges are added, insert link and mark as repledged
         for (const pid of addedPledgeIds) {
+          const matched = targetPledges.find(p => p.id === pid);
           await tx.insert(repledgePledges).values({
             repledgeId: id,
             pledgeId: pid,
+            pledgeNumber: matched?.pledgeNumber || '',
           });
         }
 
